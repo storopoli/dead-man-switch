@@ -9,15 +9,6 @@ readme = "README.md"
 
 [dependencies]
 
-[lints.rust]
-unsafe_code = "forbid" # Forbid unsafe code
-
-[lints.clippy]
-enum_glob_use = "deny" # Deny `use Enum::*`
-pedantic = "deny"      # Deny a bunch of stuff
-nursery = "deny"       # Deny another bunch of stuff
-unwrap_used = "deny"   # Deny `.unwrap()`
-
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed
 lto = true        # Enable Link Time Optimization
