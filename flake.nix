@@ -37,7 +37,7 @@
 
               rustfmt.enable = true;
 
-              clippy.enable = true;
+              #clippy.enable = true;
 
               nixpkgs-fmt.enable = true;
             };
