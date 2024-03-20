@@ -134,7 +134,7 @@ mod test {
         let config = Config::default();
         save_config(&config).unwrap();
         let config_path = config_path().unwrap();
-        let config = fs::read_to_string(&config_path).unwrap();
+        let config = fs::read_to_string(config_path).unwrap();
         let config: Config = toml::from_str(&config).unwrap();
         assert_eq!(config, Config::default());
     }
