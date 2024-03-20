@@ -5,6 +5,12 @@
 //!
 //! Use at your own risk.
 //! Check the f*(as in friendly) code.
-fn main() {
-    println!("Hello, world!");
+
+use anyhow::Result;
+
+mod config;
+
+fn main() -> Result<()> {
+    let _ = config::load_or_initialize_config()?;
+    Ok(())
 }
