@@ -1,0 +1,19 @@
+name: Build and upload binaries to release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Upload binary to release
+        uses: ncipollo/release-action@v1
