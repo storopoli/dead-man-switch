@@ -8,6 +8,10 @@ license = "AGPL-3.0-only"
 readme = "README.md"
 
 [dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.5"
+directories-next = "2"
 
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed
