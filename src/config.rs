@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 /// timer_warning = 0
 /// timer_dead_man = 0
 /// ```
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// The username for the email account
     pub username: String,
@@ -52,6 +52,24 @@ pub struct Config {
     pub timer_warning: u64,
     /// Timer in seconds for the dead man's email
     pub timer_dead_man: u64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            username: "me@example.com".to_string(),
+            password: "".to_string(),
+            smtp_server: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            message: "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case".to_string(),
+            subject: "[URGENT] Something Happened to Me!".to_string(),
+            to: "someone@example.com".to_string(),
+            from: "me@example.com".to_string(),
+            attachment: None,
+            timer_warning: 60 * 60 * 24 * 14, // 2 weeks
+            timer_dead_man: 60 * 60 * 24 * 7, // 1 week
+        }
+    }
 }
 
 /// Load the configuration from the OS-agnostic config directory.
