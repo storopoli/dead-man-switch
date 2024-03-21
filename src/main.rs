@@ -9,6 +9,7 @@
 use anyhow::Result;
 
 mod config;
+mod email;
 
 fn main() -> Result<()> {
     let _ = config::load_or_initialize_config()?;
