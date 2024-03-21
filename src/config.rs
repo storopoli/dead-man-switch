@@ -1,3 +1,5 @@
+//! Configuration module for the Dead Man's Switch
+//! Contains functions and structs to handle the configuration.
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
@@ -29,25 +31,27 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Config {
     /// The username for the email account
-    username: String,
+    pub username: String,
     /// The password for the email account
-    password: String,
+    pub password: String,
     /// The SMTP server to use
-    smtp_server: String,
+    pub smtp_server: String,
     /// The port to use for the SMTP server
-    smtp_port: u16,
+    pub smtp_port: u16,
     /// The message to send in the email
-    message: String,
+    pub message: String,
     /// The subject of the email
-    subject: String,
+    pub subject: String,
     /// The email address to send the email to
-    to: Vec<String>,
+    pub to: String,
     /// The email address to send the email from
-    from: String,
+    pub from: String,
+    /// Attachment to send with the email
+    pub attachment: Option<PathBuf>,
     /// Timer in seconds for the warning email
-    timer_warning: u64,
+    pub timer_warning: u64,
     /// Timer in seconds for the dead man's email
-    timer_dead_man: u64,
+    pub timer_dead_man: u64,
 }
 
 /// Load the configuration from the OS-agnostic config directory.
@@ -59,11 +63,27 @@ pub struct Config {
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
+///
+/// ## Notes
+///
+/// This function handles testing and non-testing environments.
 fn config_path() -> Result<PathBuf> {
-    let config_dir = BaseDirs::new()
-        .ok_or_else(|| anyhow::anyhow!("Failed to get home directory"))?
-        .config_dir()
-        .join("deadman");
+    let base_dir = if cfg!(test) {
+        // Use a temporary directory for tests
+        std::env::temp_dir()
+    } else {
+        BaseDirs::new()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get home directory"))?
+            .config_dir()
+            .to_path_buf()
+    };
+
+    let config_dir = base_dir.join(if cfg!(test) {
+        "deadman_test"
+    } else {
+        "deadman"
+    });
+
     fs::create_dir_all(&config_dir).expect("Failed to create config directory");
     Ok(config_dir.join("config.toml"))
 }
@@ -118,15 +138,9 @@ pub fn load_or_initialize_config() -> Result<Config> {
 mod test {
     use super::*;
 
-    #[test]
-    fn test_config_path() {
-        let config_path = config_path().unwrap();
-        let system_config_path = BaseDirs::new()
-            .unwrap()
-            .config_dir()
-            .join("deadman")
-            .join("config.toml");
-        assert_eq!(config_path, system_config_path);
+    fn teardown() {
+        // Cleanup test config file after each test to prevent state leakage
+        let _ = fs::remove_file(config_path().unwrap());
     }
 
     #[test]
@@ -137,11 +151,13 @@ mod test {
         let config = fs::read_to_string(config_path).unwrap();
         let config: Config = toml::from_str(&config).unwrap();
         assert_eq!(config, Config::default());
+        teardown();
     }
 
     #[test]
     fn test_load_or_initialize_config() {
         let config = load_or_initialize_config().unwrap();
         assert_eq!(config, Config::default());
+        teardown();
     }
 }
