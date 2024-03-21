@@ -1,3 +1,5 @@
+//! Configuration module for the Dead Man's Switch
+//! Contains functions and structs to handle the configuration.
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
