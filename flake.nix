@@ -25,6 +25,15 @@
           inherit system overlays;
         };
 
+        lib = pkgs.lib;
+        stdenv = pkgs.stdenv;
+
+        isDarwin = stdenv.isDarwin;
+        libsDarwin = with pkgs.darwin.apple_sdk.frameworks; lib.optionals isDarwin [
+          # Additional darwin specific inputs can be set here
+          Security
+        ];
+
         msrv = pkgs.rust-bin.stable."1.63.0".default;
       in
       with pkgs;
@@ -53,7 +62,7 @@
             packages = [
               bashInteractive
               msrv
-            ];
+            ] ++ libsDarwin;
 
             shellHook = "${_shellHook}";
           };
