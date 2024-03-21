@@ -30,27 +30,35 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Config {
-    /// The username for the email account
+    /// The username for the email account.
     pub username: String,
-    /// The password for the email account
+    /// The password for the email account.
     pub password: String,
     /// The SMTP server to use
     pub smtp_server: String,
-    /// The port to use for the SMTP server
+    /// The port to use for the SMTP server.
     pub smtp_port: u16,
-    /// The message to send in the email
+    /// The message to send in the email if you fail to check in
+    /// after the `timer_warning` with the additional `timer_dead_man`
+    /// seconds have passed.
     pub message: String,
-    /// The subject of the email
+    /// The warning message if you fail to check in `timer_warning` seconds.
+    pub message_warning: String,
+    /// The subject of the email if you fail to check in
+    /// after the `timer_warning` with the additional `timer_dead_man`
+    /// seconds have passed.
     pub subject: String,
-    /// The email address to send the email to
+    /// The subject of the email if you fail to check in `timer_warning` seconds.
+    pub subject_warning: String,
+    /// The email address to send the email to.
     pub to: String,
-    /// The email address to send the email from
+    /// The email address to send the email from.
     pub from: String,
-    /// Attachment to send with the email
+    /// Attachment to send with the email.
     pub attachment: Option<PathBuf>,
-    /// Timer in seconds for the warning email
+    /// Timer in seconds for the warning email.
     pub timer_warning: u64,
-    /// Timer in seconds for the dead man's email
+    /// Timer in seconds for the dead man's email.
     pub timer_dead_man: u64,
 }
 
@@ -62,7 +70,9 @@ impl Default for Config {
             smtp_server: "smtp.example.com".to_string(),
             smtp_port: 587,
             message: "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case".to_string(),
+            message_warning: "Hey, you haven't checked in for a while. Are you okay?".to_string(),
             subject: "[URGENT] Something Happened to Me!".to_string(),
+            subject_warning: "[URGENT] You need to check in!".to_string(),
             to: "someone@example.com".to_string(),
             from: "me@example.com".to_string(),
             attachment: None,
@@ -70,6 +80,15 @@ impl Default for Config {
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
         }
     }
+}
+
+/// Enum to represent the type of email to send.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Email {
+    /// Send the warning email.
+    Warning,
+    /// Send the dead man's email.
+    DeadMan,
 }
 
 /// Load the configuration from the OS-agnostic config directory.
