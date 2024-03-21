@@ -31,25 +31,27 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Config {
     /// The username for the email account
-    username: String,
+    pub username: String,
     /// The password for the email account
-    password: String,
+    pub password: String,
     /// The SMTP server to use
-    smtp_server: String,
+    pub smtp_server: String,
     /// The port to use for the SMTP server
-    smtp_port: u16,
+    pub smtp_port: u16,
     /// The message to send in the email
-    message: String,
+    pub message: String,
     /// The subject of the email
-    subject: String,
+    pub subject: String,
     /// The email address to send the email to
-    to: Vec<String>,
+    pub to: String,
     /// The email address to send the email from
-    from: String,
+    pub from: String,
+    /// Attachment to send with the email
+    pub attachment: Option<PathBuf>,
     /// Timer in seconds for the warning email
-    timer_warning: u64,
+    pub timer_warning: u64,
     /// Timer in seconds for the dead man's email
-    timer_dead_man: u64,
+    pub timer_dead_man: u64,
 }
 
 /// Load the configuration from the OS-agnostic config directory.
