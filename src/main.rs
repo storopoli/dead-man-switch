@@ -11,7 +11,12 @@ use anyhow::Result;
 mod config;
 mod email;
 
+use config::load_or_initialize_config;
+use email::send_email;
+
 fn main() -> Result<()> {
-    let _ = config::load_or_initialize_config()?;
+    let config = load_or_initialize_config()?;
+    send_email(&config)?;
+
     Ok(())
 }
