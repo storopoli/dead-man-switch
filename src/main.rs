@@ -8,11 +8,7 @@
 
 use anyhow::Result;
 
-mod config;
-mod email;
-
-use config::{load_or_initialize_config, Email};
-use email::send_email;
+use dead_man_switch::{load_or_initialize_config, send_email, Email};
 
 fn main() -> Result<()> {
     let config = load_or_initialize_config()?;
