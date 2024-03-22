@@ -105,8 +105,8 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
     block
 }
 
-fn timer_block() -> Block<'static> {
-    Block::default().title("Timer").borders(Borders::ALL)
+fn timer_block() -> Gauge<'static> {
+    Gauge::default().block(Block::default().title("Timer").borders(Borders::ALL))
 }
 
 /// Run the TUI.
