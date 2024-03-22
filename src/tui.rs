@@ -37,8 +37,9 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
         .margin(2)
         .constraints(
             [
-                Constraint::Length(3),
-                Constraint::Percentage(50),
+                Constraint::Max(3),
+                Constraint::Percentage(40),
+                Constraint::Max(6),
                 Constraint::Max(5),
             ]
             .as_ref(),
@@ -49,13 +50,15 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(block, chunks[0]);
     let block = ascii_block(ASCII_ART.as_ref());
     f.render_widget(block, chunks[1]);
-    let block = timer_block();
+    let block = instructions_block();
     f.render_widget(block, chunks[2]);
+    let block = timer_block();
+    f.render_widget(block, chunks[3]);
 }
 
 /// The legend block.
 ///
-/// Contains the instructions for the TUI.
+/// Contains the keys legend for the TUI.
 fn legend_block() -> Paragraph<'static> {
     let text = vec![Spans::from(vec![
         Span::styled(
@@ -84,6 +87,66 @@ fn legend_block() -> Paragraph<'static> {
     ])];
     let block = Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Center)
+        .block(Block::default().title("Keys").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+    block
+}
+
+/// The Instructions block.
+///
+/// Contains the instructions for the TUI.
+fn instructions_block() -> Paragraph<'static> {
+    let text = vec![
+        Spans::from(vec![
+            Span::styled(
+                "1. ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Open the Config with "),
+            Span::styled(
+                "o",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" and modify the settings."),
+        ]),
+        Spans::from(vec![
+            Span::styled(
+                "2. ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(
+                "Check-In with ",
+            ),
+            Span::styled(
+                "c",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(
+                " within the warning time.",
+            ),
+        ]),
+        Spans::from(vec![
+            Span::styled(
+                "3. ",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(
+                "Otherwise the Dead Man's Switch will be triggered and the message with optional attachment will be sent.",
+            ),
+        ]),
+    ];
+    let block = Paragraph::new(text)
+        .alignment(ratatui::layout::Alignment::Left)
         .block(Block::default().title("Instructions").borders(Borders::ALL))
         .wrap(Wrap { trim: true });
     block
@@ -123,7 +186,17 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
 /// Eventually, it will turn red when the warning time is done,
 /// and start counting the dead man's switch timer.
 fn timer_block() -> Gauge<'static> {
-    Gauge::default().block(Block::default().title("Timer").borders(Borders::ALL))
+    Gauge::default()
+        .percent(30)
+        .ratio(0.3)
+        .gauge_style(
+            Style::default()
+                .fg(Color::Green)
+                .bg(Color::Black)
+                .add_modifier(Modifier::ITALIC),
+        )
+        .label("Time Left: 1 day 12h 30m 10s")
+        .block(Block::default().title("Timer").borders(Borders::ALL))
 }
 
 /// Run the TUI.
