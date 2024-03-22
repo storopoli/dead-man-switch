@@ -8,12 +8,14 @@
 
 use anyhow::Result;
 
-use dead_man_switch::{load_or_initialize_config, send_email, Email};
+use dead_man_switch::run;
 
+/// The main function.
+///
+/// This function eceutes the main loop of the application
+/// by calling the [`run`] function.
 fn main() -> Result<()> {
-    let config = load_or_initialize_config()?;
-    send_email(&config, Email::Warning)?;
-    send_email(&config, Email::DeadMan)?;
+    run()?;
 
     Ok(())
 }
