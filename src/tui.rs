@@ -19,6 +19,14 @@ use ratatui::{
     Frame, Terminal,
 };
 
+const ASCII_ART: [&str; 5] = [
+    "██████  ███████  █████  ██████      ███    ███  █████  ███    ██ ███████     ███████ ██     ██ ██ ████████  ██████ ██   ██",
+    "██   ██ ██      ██   ██ ██   ██     ████  ████ ██   ██ ████   ██ ██          ██      ██     ██ ██    ██    ██      ██   ██",
+    "██   ██ █████   ███████ ██   ██     ██ ████ ██ ███████ ██ ██  ██ ███████     ███████ ██  █  ██ ██    ██    ██      ███████",
+    "██   ██ ██      ██   ██ ██   ██     ██  ██  ██ ██   ██ ██  ██ ██      ██          ██ ██ ███ ██ ██    ██    ██      ██   ██",
+    "██████  ███████ ██   ██ ██████      ██      ██ ██   ██ ██   ████ ███████     ███████  ███ ███  ██    ██     ██████ ██   ██",
+];
+
 /// The main UI function.
 ///
 /// This function will render the UI.
@@ -26,12 +34,12 @@ use ratatui::{
 fn ui<B: Backend>(f: &mut Frame<B>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(1)
+        .margin(2)
         .constraints(
             [
-                Constraint::Percentage(10),
-                Constraint::Percentage(65),
-                Constraint::Percentage(25),
+                Constraint::Length(3),
+                Constraint::Percentage(50),
+                Constraint::Max(5),
             ]
             .as_ref(),
         )
@@ -39,7 +47,7 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
 
     let block = legend_block();
     f.render_widget(block, chunks[0]);
-    let block = main_block();
+    let block = ascii_block(ASCII_ART.as_ref());
     f.render_widget(block, chunks[1]);
     let block = timer_block();
     f.render_widget(block, chunks[2]);
@@ -78,17 +86,21 @@ fn legend_block() -> Paragraph<'static> {
     block
 }
 
-fn main_block() -> Paragraph<'static> {
-    let text = vec![
-        Spans::from(Span::styled(
-            "This is a no-BS Dead Man's Switch.",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
-        Spans::from(Span::raw("Second Line")),
-    ];
+fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
+    let text: Vec<Spans<'_>> = content
+        .iter()
+        .map(|line| {
+            Spans::from(Span::styled(
+                *line,
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ))
+        })
+        .collect();
 
     let block = Paragraph::new(text)
-        .alignment(ratatui::layout::Alignment::Left)
+        .alignment(ratatui::layout::Alignment::Center)
         .block(Block::default().title("").borders(Borders::ALL))
         .wrap(Wrap { trim: true });
     block
