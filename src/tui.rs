@@ -74,10 +74,7 @@ impl ConfigState {
 
 /// The modal for the config.
 fn modal_config<B: Backend>(f: &mut Frame<B>, area: Rect) {
-    let block = Block::default()
-        .title("Config")
-        .borders(Borders::ALL)
-        .style(Style::default().bg(Color::Black).fg(Color::White));
+    let block = Block::default().title("Config").borders(Borders::ALL);
 
     f.render_widget(block, area);
 
@@ -266,7 +263,6 @@ fn timer_block() -> Gauge<'static> {
         .gauge_style(
             Style::default()
                 .fg(Color::Green)
-                .bg(Color::Black)
                 .add_modifier(Modifier::ITALIC),
         )
         .label("Time Left: 1 day 12h 30m 10s")
