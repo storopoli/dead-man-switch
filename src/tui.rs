@@ -18,6 +18,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
+/// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
     "██████  ███████  █████  ██████      ███    ███  █████  ███    ██ ███████     ███████ ██     ██ ██ ████████  ██████ ██   ██",
     "██   ██ ██      ██   ██ ██   ██     ████  ████ ██   ██ ████   ██ ██          ██      ██     ██ ██    ██    ██      ██   ██",
@@ -52,6 +53,9 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(block, chunks[2]);
 }
 
+/// The legend block.
+///
+/// Contains the instructions for the TUI.
 fn legend_block() -> Paragraph<'static> {
     let text = vec![Spans::from(vec![
         Span::styled(
@@ -85,6 +89,9 @@ fn legend_block() -> Paragraph<'static> {
     block
 }
 
+/// The ASCII block.
+///
+/// Contains the ASCII art for the TUI.
 fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
     let text: Vec<Spans<'_>> = content
         .iter()
@@ -105,6 +112,16 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
     block
 }
 
+/// The timer block.
+///
+/// Contains a [`Gauge`] widget to display the timer.
+/// The timer will be updated every second.
+///
+/// ## Notes
+///
+/// The timer will be green if is still counting the warning time.
+/// Eventually, it will turn red when the warning time is done,
+/// and start counting the dead man's switch timer.
 fn timer_block() -> Gauge<'static> {
     Gauge::default().block(Block::default().title("Timer").borders(Borders::ALL))
 }
