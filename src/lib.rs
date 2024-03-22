@@ -10,6 +10,4 @@ pub mod config;
 pub mod email;
 pub mod tui;
 
-pub use config::{load_or_initialize_config, Email};
-pub use email::send_email;
 pub use tui::run;

@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 
-use dead_man_switch::{load_or_initialize_config, run, send_email, Email};
+use dead_man_switch::run;
 
 fn main() -> Result<()> {
     run()?;
