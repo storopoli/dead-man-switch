@@ -14,7 +14,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Gauge, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
 
@@ -33,10 +33,6 @@ const ASCII_ART: [&str; 5] = [
 /// It's a simple UI with 3 blocks.
 fn ui<B: Backend>(f: &mut Frame<B>, config_state: &ConfigState) {
     let modal_area = create_modal_rect(f.size(), 1.2);
-    // Draw the modal if config_state.0 is true
-    if config_state.0 {
-        modal_config(f, modal_area);
-    }
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -60,6 +56,11 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_state: &ConfigState) {
     f.render_widget(block, chunks[2]);
     let block = timer_block();
     f.render_widget(block, chunks[3]);
+
+    // Draw the modal if config_state.0 is true
+    if config_state.0 {
+        modal_config(f, modal_area);
+    }
 }
 
 /// Whether the config modal is open or not.
@@ -74,6 +75,9 @@ impl ConfigState {
 
 /// The modal for the config.
 fn modal_config<B: Backend>(f: &mut Frame<B>, area: Rect) {
+    // This clears out the modal area, ensuring no leftover content
+    f.render_widget(Clear, area);
+
     let block = Block::default().title("Config").borders(Borders::ALL);
 
     f.render_widget(block, area);
