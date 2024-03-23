@@ -1,7 +1,7 @@
 //! This module contains the TUI implementation for the Dead Man's Switch.
 
+use std::io;
 use std::time::Duration;
-use std::{io, time::Instant};
 
 use anyhow::Result;
 use crossterm::{
