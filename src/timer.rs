@@ -53,6 +53,11 @@ impl Timer {
         self.timer_type
     }
 
+    /// Get the elapsed time.
+    pub fn elapsed(&self) -> Duration {
+        Instant::now().duration_since(self.start)
+    }
+
     /// Calculate the remaining time as a percentage
     pub fn remaining_percent(&self) -> u16 {
         let elapsed = self.start.elapsed().as_secs();
@@ -65,5 +70,21 @@ impl Timer {
     pub fn label(&self) -> String {
         let remaining = self.duration - self.start.elapsed();
         format!("Time Left: {:?}", remaining)
+    }
+
+    /// Update the timer logic for switching from [`TimerType::Warning`] to
+    /// [`TimerType::DeadMan`].
+    pub fn update(&mut self, elapsed: Duration, dead_man_duration: u64) {
+        if self.timer_type == TimerType::Warning && elapsed >= self.duration {
+            self.timer_type = TimerType::DeadMan;
+            // Reset the start time for the DeadMan timer
+            self.start = Instant::now();
+            self.duration = Duration::from_secs(dead_man_duration);
+        }
+    }
+
+    /// Check if the timer has expired.
+    pub fn expired(&self) -> bool {
+        self.start.elapsed() >= self.duration
     }
 }

@@ -1,7 +1,7 @@
 //! This module contains the TUI implementation for the Dead Man's Switch.
 
-use std::io;
 use std::time::Duration;
+use std::{io, time::Instant};
 
 use anyhow::Result;
 use crossterm::{
@@ -60,11 +60,18 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
     let instructions_widget = instructions_block(config_path);
     f.render_widget(instructions_widget, chunks[2]);
 
+    let gauge_title = timer.title();
     let gauge_style = timer.gauge_style();
     let label_style = timer.label_style();
     let label = timer.label();
     let current_percent = timer.remaining_percent();
-    let timer_widget = timer_block(current_percent, label, gauge_style, label_style);
+    let timer_widget = timer_block(
+        gauge_title,
+        current_percent,
+        label,
+        gauge_style,
+        label_style,
+    );
     f.render_widget(timer_widget, chunks[3]);
 }
 
@@ -186,6 +193,7 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
 ///
 /// ## Parameters
 ///
+/// - `title`: The title for the timer.
 /// - `current_percent`: The current percentage of the timer.
 /// - `label`: The label for the timer.
 /// - `gauge_style`: The [`GaugeStyle`] for the timer.
@@ -196,16 +204,24 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
 /// Eventually, it will turn red when the warning time is done,
 /// and start counting the dead man's switch timer.
 fn timer_block(
+    title: String,
     current_percent: u16,
     label: String,
     gauge_style: Style,
     label_style: Style,
 ) -> Gauge<'static> {
+    let title = Span::styled(
+        format!("Timer: {title}"),
+        match current_percent {
+            0..=30 => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            _ => Style::default().fg(Color::Green),
+        },
+    );
     Gauge::default()
         .percent(current_percent)
         .gauge_style(gauge_style)
         .label(Span::styled(label, label_style))
-        .block(Block::default().title("Timer").borders(Borders::ALL))
+        .block(Block::default().title(title).borders(Borders::ALL))
 }
 
 impl Timer {
@@ -231,6 +247,14 @@ impl Timer {
         };
         Style::default().fg(style.fg.unwrap())
     }
+
+    // Determine the Widget title based on the type of Timer
+    fn title(&self) -> String {
+        match self.get_type() {
+            TimerType::Warning => "Warning".to_string(),
+            TimerType::DeadMan => "Dead Man's Switch".to_string(),
+        }
+    }
 }
 
 /// Run the TUI.
@@ -254,7 +278,7 @@ pub fn run() -> Result<()> {
         .to_string_lossy()
         .to_string();
 
-    // Create a new mutable Timer
+    // Create a new Timer
     let mut timer = Timer::new(
         TimerType::Warning,
         Duration::from_secs(config.timer_warning),
@@ -262,7 +286,9 @@ pub fn run() -> Result<()> {
 
     // Main loop
     loop {
-        terminal.draw(|f| ui(f, &config_path, &mut timer))?;
+        let elapsed = timer.elapsed();
+        timer.update(elapsed, config.timer_dead_man);
+        terminal.draw(|f| ui(f, &config_path, &timer))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
@@ -273,6 +299,12 @@ pub fn run() -> Result<()> {
                     _ => {}
                 }
             }
+        }
+
+        // Condition to exit the loop, adjust according to your logic
+        if timer.expired() {
+            // TODO: Send email based on TimerType
+            println!("Timer expired");
         }
     }
 
