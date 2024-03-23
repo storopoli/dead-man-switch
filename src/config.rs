@@ -104,7 +104,7 @@ pub enum Email {
 /// ## Notes
 ///
 /// This function handles testing and non-testing environments.
-fn config_path() -> Result<PathBuf> {
+pub fn config_path() -> Result<PathBuf> {
     let base_dir = if cfg!(test) {
         // Use a temporary directory for tests
         std::env::temp_dir()

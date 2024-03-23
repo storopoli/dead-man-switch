@@ -18,6 +18,8 @@ use ratatui::{
     Frame, Terminal,
 };
 
+use crate::config::{config_path, load_or_initialize_config};
+
 /// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
     "██████  ███████  █████  ██████      ███    ███  █████  ███    ██ ███████     ███████ ██     ██ ██ ████████  ██████ ██   ██",
@@ -31,7 +33,7 @@ const ASCII_ART: [&str; 5] = [
 ///
 /// This function will render the UI.
 /// It's a simple UI with 3 blocks.
-fn ui<B: Backend>(f: &mut Frame<B>) {
+fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -50,7 +52,7 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(block, chunks[0]);
     let block = ascii_block(ASCII_ART.as_ref());
     f.render_widget(block, chunks[1]);
-    let block = instructions_block();
+    let block = instructions_block(&config_path);
     f.render_widget(block, chunks[2]);
     let block = timer_block();
     f.render_widget(block, chunks[3]);
@@ -70,14 +72,6 @@ fn legend_block() -> Paragraph<'static> {
         Span::raw(":Check-In"),
         Span::raw("    "),
         Span::styled(
-            "o",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(":Options"),
-        Span::raw("    "),
-        Span::styled(
             "q/Esc",
             Style::default()
                 .fg(Color::Green)
@@ -95,7 +89,7 @@ fn legend_block() -> Paragraph<'static> {
 /// The Instructions block.
 ///
 /// Contains the instructions for the TUI.
-fn instructions_block() -> Paragraph<'static> {
+fn instructions_block(config_path: &str) -> Paragraph<'static> {
     let text = vec![
         Spans::from(vec![
             Span::styled(
@@ -104,9 +98,9 @@ fn instructions_block() -> Paragraph<'static> {
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw("Open the Config with "),
+            Span::raw("Edit the Config at "),
             Span::styled(
-                "o",
+                format!("{config_path}"),
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
@@ -211,9 +205,18 @@ pub fn run() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // Instantiate the Config
+    let _config = load_or_initialize_config()?;
+
+    // Get config OS-agnostic path
+    let config_path = config_path()
+        .expect("Failed to get config path")
+        .to_string_lossy()
+        .to_string();
+
     // Main loop
     loop {
-        terminal.draw(ui)?;
+        terminal.draw(|f| ui(f, &config_path))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
@@ -221,7 +224,6 @@ pub fn run() -> Result<()> {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break, // Quit
                     KeyCode::Char('c') => todo!(),              // Check-In
-                    KeyCode::Char('o') => todo!(),              // Options
                     _ => {}
                 }
             }
