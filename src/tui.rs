@@ -301,10 +301,13 @@ pub fn run() -> Result<()> {
             }
         }
 
-        // Condition to exit the loop, adjust according to your logic
+        // Condition to exit the loop
         if timer.expired() {
             // TODO: Send email based on TimerType
             println!("Timer expired");
+            if timer.get_type() == TimerType::DeadMan {
+                break;
+            }
         }
     }
 
