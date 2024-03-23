@@ -72,5 +72,9 @@
           rustPlatform = pkgs.rustPlatform;
           rust = msrv;
         };
+
+        flake.overlays.default = (final: prev: {
+          dead-man-switch = self.packages.${final.system}.default;
+        });
       });
 }

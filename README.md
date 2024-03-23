@@ -50,6 +50,44 @@ and provide the _absolute_ path to the file you want to attach.
 
 To check-in, you just need to press the `c` key as in **c**heck-in.
 
+## Installation
+
+There are several ways to install Dead Man's Switch:
+
+1. [Crates.io](https://crates.io/crates/dead-man-switch): `cargo install dead-man-switch`.
+1. [GitHub](https://github.com/storopoli/dead-man-switch): `cargo install --git https://github.com/storopoli/dead-man-switch`.
+1. From source: Clone the repository and run `cargo install --path .`.
+1. Using Nix: `nix run github#storopoli/dead-man-switch`.
+1. Using Nix Flakes: add this to your `flake.nix`:
+
+   ```nix
+   {
+     # ...
+     inputs.dead-man-switch = {
+       url = "github:storopoli/neovix";
+       inputs = {
+         nixpkgs.follows = "nixpkgs";
+         flake-parts.follows = "flake-parts";
+       };
+     };
+
+     outputs = inputs @ { self, ... }:
+     {
+       imports = [
+         {
+           nixpkgs.overlays = [
+             # ...
+             inputs.dead-man-switch.overlays.default
+           ];
+         }
+       ];
+     };
+
+   }
+   ```
+
+   Then `dead-man-switch` will be available as `pkgs.dead-man-switch`;
+
 ## Minimum Supported Rust Version
 
 This crate uses current Debian stable Rust version as Minimum Supported Rust
