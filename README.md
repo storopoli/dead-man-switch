@@ -2,7 +2,13 @@
 
 [![AGPL-v3](https://img.shields.io/badge/License-AGPL&nbsp;v3-lightgrey.svg)](https://opensource.org/license/agpl-v3/)
 
-![screnshot](screenshot.png)
+This is a simple implementation of a
+[Dead Man's Switch](https://en.wikipedia.org/wiki/Dead_man%27s_switch).
+
+Use at your own risk.
+Check the f****(as in friendly) code.
+
+![screenshot](https://github.com/storopoli/dead-man-switch/blob/main/screenshot.png)
 
 Dead man's switches are designed to require positive action
 or they will automatically deploy.
