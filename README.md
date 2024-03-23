@@ -1,6 +1,8 @@
 # Dead Man's Switch
 
 [![AGPL-v3](https://img.shields.io/badge/License-AGPL&nbsp;v3-lightgrey.svg)](https://opensource.org/license/agpl-v3/)
+[![Crates.io](https://img.shields.io/crates/v/dead-man-switch)](https://crates.io/crates/dead-man-switch)
+[![docs](https://img.shields.io/crates/v/dead-man-switch?color=yellow&label=docs)](https://docs.rs/dead-man-switch)
 
 This is a simple implementation of a
 [Dead Man's Switch](https://en.wikipedia.org/wiki/Dead_man%27s_switch).
