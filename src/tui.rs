@@ -295,7 +295,7 @@ pub fn run() -> Result<()> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break, // Quit
-                    KeyCode::Char('c') => timer.reset(),        // Check-In
+                    KeyCode::Char('c') => timer.reset(&config), // Check-In
                     _ => {}
                 }
             }

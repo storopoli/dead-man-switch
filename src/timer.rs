@@ -90,11 +90,21 @@ impl Timer {
         self.start.elapsed() >= self.duration
     }
 
-    /// Reset the timer.
+    /// Reset the timer and promotes the timer type from [`TimerType::DeadMan`]
+    /// to [`TimerType::Warning`], if applicable.
     ///
     /// This is called when the user checks in.
-    pub fn reset(&mut self) {
-        self.start = Instant::now();
+    pub fn reset(&mut self, config: &crate::config::Config) {
+        match self.get_type() {
+            TimerType::Warning => {
+                self.start = Instant::now();
+            }
+            TimerType::DeadMan => {
+                self.timer_type = TimerType::Warning;
+                self.start = Instant::now();
+                self.duration = Duration::from_secs(config.timer_warning);
+            }
+        }
     }
 }
 
