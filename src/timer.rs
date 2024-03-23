@@ -88,3 +88,39 @@ impl Timer {
         self.start.elapsed() >= self.duration
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timer_creation() {
+        let warning_timer = Timer::new(TimerType::Warning, Duration::from_secs(60));
+        assert_eq!(warning_timer.get_type(), TimerType::Warning);
+        assert!(warning_timer.duration == Duration::from_secs(60));
+    }
+
+    #[test]
+    fn timer_elapsed_less_than_duration() {
+        let timer = Timer::new(TimerType::Warning, Duration::from_secs(60));
+        assert!(timer.elapsed() < Duration::from_secs(60));
+    }
+
+    #[test]
+    fn timer_update_to_dead_man() {
+        let mut timer = Timer::new(TimerType::Warning, Duration::from_secs(1));
+        // Simulate elapsed time by directly manipulating the timer's state.
+        timer.update(Duration::from_secs(2), 3600);
+        assert_eq!(timer.get_type(), TimerType::DeadMan);
+        assert_eq!(timer.duration, Duration::from_secs(3600));
+        assert!(!timer.expired());
+    }
+
+    #[test]
+    fn timer_expiration() {
+        let timer = Timer::new(TimerType::Warning, Duration::from_secs(1));
+        // Directly simulate the passage of time
+        std::thread::sleep(Duration::from_secs(2));
+        assert!(timer.expired());
+    }
+}
