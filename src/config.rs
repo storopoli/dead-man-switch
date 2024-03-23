@@ -95,18 +95,21 @@ impl Default for Config {
     }
 }
 
+/// Iterator for [`Config`].
 #[derive(Debug, Clone)]
 pub struct ConfigIterator<'a> {
     config: &'a Config,
     index: usize,
 }
 
+/// Constructor for the ConfigIterator that takes a [`Config`].
 impl<'a> ConfigIterator<'a> {
     pub fn new(config: &'a Config) -> ConfigIterator {
         ConfigIterator { config, index: 0 }
     }
 }
 
+/// Implementation of the Iterator trait for [`ConfigIterator`].
 impl<'a> Iterator for ConfigIterator<'a> {
     type Item = (&'a str, &'a str);
     fn next(&mut self) -> Option<Self::Item> {
