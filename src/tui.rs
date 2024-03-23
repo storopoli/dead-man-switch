@@ -19,7 +19,7 @@ use ratatui::{
 };
 
 use crate::{
-    config::{config_path, load_or_initialize_config},
+    config::{config_path, load_or_initialize_config, Email},
     timer::{Timer, TimerType},
 };
 
@@ -303,10 +303,14 @@ pub fn run() -> Result<()> {
 
         // Condition to exit the loop
         if timer.expired() {
-            // TODO: Send email based on TimerType
-            println!("Timer expired");
-            if timer.get_type() == TimerType::DeadMan {
-                break;
+            match timer.get_type() {
+                TimerType::Warning => {
+                    config.send_email(Email::Warning)?;
+                }
+                TimerType::DeadMan => {
+                    config.send_email(Email::DeadMan)?;
+                    break;
+                }
             }
         }
     }
