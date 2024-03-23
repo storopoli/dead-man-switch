@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use chrono::Duration as ChronoDuration;
 
 /// The timer enum.
 ///
@@ -69,7 +69,9 @@ impl Timer {
     /// Update label based on the remaining time
     pub fn label(&self) -> String {
         let remaining = self.duration - self.start.elapsed();
-        format!("Time Left: {:?}", remaining)
+        let remaining_chrono =
+            ChronoDuration::try_seconds(remaining.as_secs() as i64).expect("Invalid duration");
+        format_duration(remaining_chrono)
     }
 
     /// Update the timer logic for switching from [`TimerType::Warning`] to
@@ -87,6 +89,31 @@ impl Timer {
     pub fn expired(&self) -> bool {
         self.start.elapsed() >= self.duration
     }
+}
+
+/// Formats a duration into a human-readable string adjusting the resolution based on the duration.
+fn format_duration(duration: ChronoDuration) -> String {
+    let days = duration.num_days();
+    let hours = duration.num_hours() % 24;
+    let minutes = duration.num_minutes() % 60;
+    let seconds = duration.num_seconds() % 60;
+
+    let mut parts = vec![];
+
+    if days > 0 {
+        parts.push(format!("{} day(s)", days));
+    }
+    if hours > 0 {
+        parts.push(format!("{} hour(s)", hours));
+    }
+    if minutes > 0 {
+        parts.push(format!("{} minute(s)", minutes));
+    }
+    if seconds > 0 || parts.is_empty() {
+        parts.push(format!("{} second(s)", seconds));
+    }
+
+    parts.join(", ")
 }
 
 #[cfg(test)]
