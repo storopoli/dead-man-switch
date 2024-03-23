@@ -1,6 +1,6 @@
 //! Email sending capabilities of the Dead Man's Switch.
 
-use std::fs;
+use std::{fs, str::FromStr};
 
 use anyhow::Result;
 use lettre::{
@@ -9,7 +9,7 @@ use lettre::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    Message, SmtpTransport, Transport,
+    Address, Message, SmtpTransport, Transport,
 };
 
 use crate::config::{Config, Email};
@@ -51,7 +51,12 @@ impl Config {
     fn create_email(&self, email_type: Email) -> Result<Message> {
         // Guaranteed config values
         let from = Mailbox::new(None, self.from.parse()?);
-        let to = Mailbox::new(None, self.to.parse()?);
+        // Adjust the email to based on the email type
+        let to = match email_type {
+            Email::Warning => Address::from_str(&self.from)?,
+            Email::DeadMan => Address::from_str(&self.to)?,
+        };
+        let to = Mailbox::new(None, to);
 
         // Adjust the email builder based on the email type
         let email_builder = Message::builder().from(from).to(to);
