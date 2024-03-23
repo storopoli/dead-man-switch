@@ -29,6 +29,9 @@ the switch automatically sends the desired message.
 
 ## How it Works
 
+> If you want a very simple explanation and the motivation behind the project,
+> check my blog post [here](https://storopoli.io/2024-03-23-dead-man-switch/).
+
 Upon starting the program it will create a `config.toml` file in an OS-agnostic
 config file location:
 
