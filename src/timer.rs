@@ -150,4 +150,63 @@ mod tests {
         std::thread::sleep(Duration::from_secs(2));
         assert!(timer.expired());
     }
+
+    #[test]
+    fn format_seconds_only() {
+        let duration = ChronoDuration::try_seconds(45).unwrap();
+        assert_eq!(format_duration(duration), "45 second(s)");
+    }
+
+    #[test]
+    fn format_minutes_and_seconds() {
+        let duration =
+            ChronoDuration::try_minutes(5).unwrap() + ChronoDuration::try_seconds(30).unwrap();
+        assert_eq!(format_duration(duration), "5 minute(s), 30 second(s)");
+    }
+
+    #[test]
+    fn format_hours_minutes_and_seconds() {
+        let duration = ChronoDuration::try_hours(2).unwrap()
+            + ChronoDuration::try_minutes(15).unwrap()
+            + ChronoDuration::try_seconds(10).unwrap();
+        assert_eq!(
+            format_duration(duration),
+            "2 hour(s), 15 minute(s), 10 second(s)"
+        );
+    }
+
+    #[test]
+    fn format_days_hours_minutes() {
+        let duration = ChronoDuration::try_days(1).unwrap()
+            + ChronoDuration::try_hours(3).unwrap()
+            + ChronoDuration::try_minutes(45).unwrap();
+        assert_eq!(
+            format_duration(duration),
+            "1 day(s), 3 hour(s), 45 minute(s)"
+        );
+    }
+
+    #[test]
+    fn format_days_only() {
+        let duration = ChronoDuration::try_days(4).unwrap();
+        assert_eq!(format_duration(duration), "4 day(s)");
+    }
+
+    #[test]
+    fn format_large_duration() {
+        let duration = ChronoDuration::try_days(7).unwrap()
+            + ChronoDuration::try_hours(23).unwrap()
+            + ChronoDuration::try_minutes(59).unwrap()
+            + ChronoDuration::try_seconds(59).unwrap();
+        assert_eq!(
+            format_duration(duration),
+            "7 day(s), 23 hour(s), 59 minute(s), 59 second(s)"
+        );
+    }
+
+    #[test]
+    fn format_zero_duration() {
+        let duration = ChronoDuration::try_seconds(0).unwrap();
+        assert_eq!(format_duration(duration), "0 second(s)");
+    }
 }
