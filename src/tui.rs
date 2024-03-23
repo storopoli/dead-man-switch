@@ -18,6 +18,7 @@ use ratatui::{
     Frame, Terminal,
 };
 
+use crate::config::{load_or_initialize_config, Config, ConfigIterator};
 /// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
     "██████  ███████  █████  ██████      ███    ███  █████  ███    ██ ███████     ███████ ██     ██ ██ ████████  ██████ ██   ██",
@@ -31,7 +32,7 @@ const ASCII_ART: [&str; 5] = [
 ///
 /// This function will render the UI.
 /// It's a simple UI with 3 blocks.
-fn ui<B: Backend>(f: &mut Frame<B>, config_state: &ConfigState) {
+fn ui<B: Backend>(f: &mut Frame<B>, config_state: &ConfigState, config: &Config) {
     let modal_area = create_modal_rect(f.size(), 1.2);
 
     let chunks = Layout::default()
@@ -59,7 +60,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_state: &ConfigState) {
 
     // Draw the modal if config_state.0 is true
     if config_state.0 {
-        modal_config(f, modal_area);
+        modal_config(f, modal_area, config);
     }
 }
 
@@ -74,7 +75,7 @@ impl ConfigState {
 }
 
 /// The modal for the config.
-fn modal_config<B: Backend>(f: &mut Frame<B>, area: Rect) {
+fn modal_config<B: Backend>(f: &mut Frame<B>, area: Rect, config: &Config) {
     // This clears out the modal area, ensuring no leftover content
     f.render_widget(Clear, area);
 
@@ -294,9 +295,12 @@ pub fn run() -> Result<()> {
     // Instantiate the ConfigState
     let mut config_state = ConfigState(false);
 
+    // Instantiate the Config
+    let config = load_or_initialize_config()?;
+
     // Main loop
     loop {
-        terminal.draw(|f| ui(f, &config_state))?;
+        terminal.draw(|f| ui(f, &config_state, &config))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
