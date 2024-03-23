@@ -20,7 +20,6 @@ use ratatui::{
 
 use crate::{
     config::{config_path, load_or_initialize_config, Email},
-    email::send_email,
     timer::{Timer, TimerType},
 };
 
@@ -306,10 +305,10 @@ pub fn run() -> Result<()> {
         if timer.expired() {
             match timer.get_type() {
                 TimerType::Warning => {
-                    send_email(&config, Email::Warning)?;
+                    config.send_email(Email::Warning)?;
                 }
                 TimerType::DeadMan => {
-                    send_email(&config, Email::DeadMan)?;
+                    config.send_email(Email::DeadMan)?;
                     break;
                 }
             }

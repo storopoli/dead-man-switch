@@ -14,20 +14,6 @@ use serde::{Deserialize, Serialize};
 ///
 /// If the configuration file does not exist, it will be created with
 /// the default values.
-/// In other words, the default values are:
-///
-/// ```toml
-/// username = ""
-/// password = ""
-/// smtp_server = ""
-/// smtp_port = 0
-/// message = ""
-/// subject = ""
-/// to = []
-/// from = ""
-/// timer_warning = 0
-/// timer_dead_man = 0
-/// ```
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// The username for the email account.
