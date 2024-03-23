@@ -55,7 +55,7 @@ impl Default for Config {
             password: "".to_string(),
             smtp_server: "smtp.example.com".to_string(),
             smtp_port: 587,
-            message: "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case".to_string(),
+            message: "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case.".to_string(),
             message_warning: "Hey, you haven't checked in for a while. Are you okay?".to_string(),
             subject: "[URGENT] Something Happened to Me!".to_string(),
             subject_warning: "[URGENT] You need to check in!".to_string(),
