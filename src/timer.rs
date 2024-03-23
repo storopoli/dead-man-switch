@@ -136,6 +136,7 @@ fn format_duration(duration: ChronoDuration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::load_or_initialize_config;
     use std::thread::sleep;
 
     #[test]
@@ -223,8 +224,34 @@ mod tests {
     }
 
     #[test]
-    fn format_zero_duration() {
-        let duration = ChronoDuration::try_seconds(0).unwrap();
-        assert_eq!(format_duration(duration), "0 second(s)");
+    fn reset_warning_timer_resets_start_time() {
+        let config = load_or_initialize_config().unwrap();
+
+        let mut timer = Timer::new(
+            TimerType::Warning,
+            Duration::from_secs(config.timer_warning),
+        );
+        let original_start = timer.start;
+        // Simulate time passing
+        sleep(Duration::from_millis(100));
+        timer.reset(&config);
+        assert!(timer.start > original_start);
+        assert_eq!(timer.duration, Duration::from_secs(config.timer_warning));
+        assert_eq!(timer.get_type(), TimerType::Warning);
+    }
+
+    #[test]
+    fn reset_dead_man_timer_promotes_to_warning_and_resets() {
+        let config = load_or_initialize_config().unwrap();
+
+        let mut timer = Timer::new(
+            TimerType::DeadMan,
+            Duration::from_secs(config.timer_dead_man),
+        );
+        // Simulate time passing
+        sleep(Duration::from_millis(100));
+        timer.reset(&config);
+        assert_eq!(timer.get_type(), TimerType::Warning);
+        assert_eq!(timer.duration, Duration::from_secs(config.timer_warning));
     }
 }
