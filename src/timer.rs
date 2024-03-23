@@ -1,4 +1,4 @@
-//! This module contains the timer implementations
+//! Timer implementations
 //!
 //! Timers are created using the [`Timer`] struct.
 //!
