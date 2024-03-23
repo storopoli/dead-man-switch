@@ -60,6 +60,14 @@ pub struct Config {
     pub timer_warning: u64,
     /// Timer in seconds for the dead man's email.
     pub timer_dead_man: u64,
+    /// Additional field for String SMTP port representation
+    pub smtp_port_str: String,
+    /// Additional field for String warning timer representation
+    pub timer_warning_str: String,
+    /// Additional field for String dead man's timer representation
+    pub timer_dead_man_str: String,
+    /// Additional field for String attachment representation
+    pub attachment_str: Option<String>,
 }
 
 impl Default for Config {
@@ -78,7 +86,51 @@ impl Default for Config {
             attachment: None,
             timer_warning: 60 * 60 * 24 * 14, // 2 weeks
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
+            // Initialize new fields with string representations
+            smtp_port_str: 587.to_string(),
+            timer_warning_str: (60 * 60 * 24 * 14).to_string(), // 2 weeks
+            timer_dead_man_str: (60 * 60 * 24 * 7).to_string(), // 1 week
+            attachment_str: None, // No attachment by default
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ConfigIterator<'a> {
+    config: &'a Config,
+    index: usize,
+}
+
+impl<'a> ConfigIterator<'a> {
+    pub fn new(config: &'a Config) -> ConfigIterator {
+        ConfigIterator { config, index: 0 }
+    }
+}
+
+impl<'a> Iterator for ConfigIterator<'a> {
+    type Item = (&'a str, &'a str);
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = match self.index {
+            0 => Some(("Username", &self.config.username as &str)),
+            1 => Some(("Password", &self.config.password as &str)),
+            2 => Some(("SMTP Server", &self.config.smtp_server as &str)),
+            3 => Some(("SMTP Port", &self.config.smtp_port_str as &str)),
+            4 => Some(("Dead Man's Message", &self.config.message as &str)),
+            5 => Some(("Warning Message", &self.config.message_warning as &str)),
+            6 => Some(("Dead Man's Subject", &self.config.subject as &str)),
+            7 => Some(("Warning Subject", &self.config.subject_warning as &str)),
+            8 => Some(("To", &self.config.to as &str)),
+            9 => Some(("From", &self.config.from as &str)),
+            10 => match self.config.attachment_str.as_deref() {
+                Some(attachment) => Some(("Attachment File", attachment)),
+                None => Some(("Attachment File", "No attachment")),
+            },
+            11 => Some(("Warning Timer", &self.config.timer_warning_str as &str)),
+            12 => Some(("Dead Man's Timer", &self.config.timer_dead_man_str as &str)),
+            _ => None,
+        };
+        self.index += 1;
+        result
     }
 }
 
@@ -196,5 +248,48 @@ mod test {
         let config = load_or_initialize_config().unwrap();
         assert_eq!(config, Config::default());
         teardown();
+    }
+
+    #[test]
+    fn test_config_iterator() {
+        let config = Config::default();
+        let mut iter = ConfigIterator::new(&config);
+        assert_eq!(iter.next(), Some(("Username", &config.username as &str)));
+        assert_eq!(iter.next(), Some(("Password", &config.password as &str)));
+        assert_eq!(
+            iter.next(),
+            Some(("SMTP Server", &config.smtp_server as &str))
+        );
+        assert_eq!(
+            iter.next(),
+            Some(("SMTP Port", &config.smtp_port_str as &str))
+        );
+        assert_eq!(
+            iter.next(),
+            Some(("Dead Man's Message", &config.message as &str))
+        );
+        assert_eq!(
+            iter.next(),
+            Some(("Warning Message", &config.message_warning as &str))
+        );
+        assert_eq!(
+            iter.next(),
+            Some(("Dead Man's Subject", &config.subject as &str))
+        );
+        assert_eq!(
+            iter.next(),
+            Some(("Warning Subject", &config.subject_warning as &str))
+        );
+        assert_eq!(iter.next(), Some(("To", &config.to as &str)));
+        assert_eq!(iter.next(), Some(("From", &config.from as &str)));
+        assert_eq!(iter.next(), Some(("Attachment File", "No attachment")));
+        assert_eq!(
+            iter.next(),
+            Some(("Warning Timer", &config.timer_warning_str as &str))
+        );
+        assert_eq!(
+            iter.next(),
+            Some(("Dead Man's Timer", &config.timer_dead_man_str as &str))
+        );
     }
 }

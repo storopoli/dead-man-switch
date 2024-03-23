@@ -120,6 +120,10 @@ mod tests {
             attachment: None,
             timer_warning: 60,
             timer_dead_man: 120,
+            smtp_port_str: "587".to_string(),
+            timer_warning_str: "60".to_string(),
+            timer_dead_man_str: "120".to_string(),
+            attachment_str: None,
         }
     }
 
