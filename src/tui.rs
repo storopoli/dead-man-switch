@@ -18,7 +18,10 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::config::{config_path, load_or_initialize_config};
+use crate::{
+    config::{config_path, load_or_initialize_config},
+    timer::{Timer, TimerType},
+};
 
 /// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
@@ -33,7 +36,7 @@ const ASCII_ART: [&str; 5] = [
 ///
 /// This function will render the UI.
 /// It's a simple UI with 3 blocks.
-fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str) {
+fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -48,14 +51,21 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str) {
         )
         .split(f.size());
 
-    let block = legend_block();
-    f.render_widget(block, chunks[0]);
-    let block = ascii_block(ASCII_ART.as_ref());
-    f.render_widget(block, chunks[1]);
-    let block = instructions_block(config_path);
-    f.render_widget(block, chunks[2]);
-    let block = timer_block();
-    f.render_widget(block, chunks[3]);
+    let legend_widget = legend_block();
+    f.render_widget(legend_widget, chunks[0]);
+
+    let ascii_widget = ascii_block(ASCII_ART.as_ref());
+    f.render_widget(ascii_widget, chunks[1]);
+
+    let instructions_widget = instructions_block(config_path);
+    f.render_widget(instructions_widget, chunks[2]);
+
+    let gauge_style = timer.gauge_style();
+    let label_style = timer.label_style();
+    let label = timer.label();
+    let current_percent = timer.remaining_percent();
+    let timer_widget = timer_block(current_percent, label, gauge_style, label_style);
+    f.render_widget(timer_widget, chunks[3]);
 }
 
 /// The legend block.
@@ -174,23 +184,53 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
 /// Contains a [`Gauge`] widget to display the timer.
 /// The timer will be updated every second.
 ///
+/// ## Parameters
+///
+/// - `current_percent`: The current percentage of the timer.
+/// - `label`: The label for the timer.
+/// - `gauge_style`: The [`GaugeStyle`] for the timer.
+///
 /// ## Notes
 ///
 /// The timer will be green if is still counting the warning time.
 /// Eventually, it will turn red when the warning time is done,
 /// and start counting the dead man's switch timer.
-fn timer_block() -> Gauge<'static> {
+fn timer_block(
+    current_percent: u16,
+    label: String,
+    gauge_style: Style,
+    label_style: Style,
+) -> Gauge<'static> {
     Gauge::default()
-        .percent(30)
-        .ratio(0.3)
-        .gauge_style(
-            Style::default()
-                .fg(Color::Green)
-                .bg(Color::Black)
-                .add_modifier(Modifier::ITALIC),
-        )
-        .label("Time Left: 1 day 12h 30m 10s")
+        .percent(current_percent)
+        .gauge_style(gauge_style)
+        .label(Span::styled(label, label_style))
         .block(Block::default().title("Timer").borders(Borders::ALL))
+}
+
+impl Timer {
+    /// Determine the gauge style based on the timer state
+    fn gauge_style(&self) -> Style {
+        let percent = self.remaining_percent();
+        let style = if percent > 30 {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+        Style::default().fg(style.fg.unwrap())
+    }
+
+    // Determine the label style based on the timer state
+    fn label_style(&self) -> Style {
+        let percent = self.remaining_percent();
+
+        let style = if percent > 30 {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        };
+        Style::default().fg(style.fg.unwrap())
+    }
 }
 
 /// Run the TUI.
@@ -206,7 +246,7 @@ pub fn run() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // Instantiate the Config
-    let _config = load_or_initialize_config()?;
+    let config = load_or_initialize_config()?;
 
     // Get config OS-agnostic path
     let config_path = config_path()
@@ -214,9 +254,15 @@ pub fn run() -> Result<()> {
         .to_string_lossy()
         .to_string();
 
+    // Create a new mutable Timer
+    let mut timer = Timer::new(
+        TimerType::Warning,
+        Duration::from_secs(config.timer_warning),
+    );
+
     // Main loop
     loop {
-        terminal.draw(|f| ui(f, &config_path))?;
+        terminal.draw(|f| ui(f, &config_path, &mut timer))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
