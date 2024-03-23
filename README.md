@@ -8,7 +8,7 @@ This is a simple implementation of a
 Use at your own risk.
 Check the f****(as in friendly) code.
 
-![screenshot](https://github.com/storopoli/dead-man-switch/blob/main/screenshot.png)
+![screenshot](https://github.com/storopoli/dead-man-switch/raw/main/screenshot.png)
 
 Dead man's switches are designed to require positive action
 or they will automatically deploy.
