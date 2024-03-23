@@ -8,6 +8,7 @@
 
 pub mod config;
 pub mod email;
+pub mod timer;
 pub mod tui;
 
 pub use tui::run;

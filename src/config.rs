@@ -155,7 +155,7 @@ pub fn save_config(config: &Config) -> Result<()> {
 /// ## Example
 ///
 /// ```rust
-/// use deadman::config::load_or_initialize_config;
+/// use dead_man_switch::config::load_or_initialize_config;
 /// let config = load_or_initialize_config().unwrap();
 /// ```
 pub fn load_or_initialize_config() -> Result<Config> {
