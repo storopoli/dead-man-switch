@@ -52,7 +52,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str) {
     f.render_widget(block, chunks[0]);
     let block = ascii_block(ASCII_ART.as_ref());
     f.render_widget(block, chunks[1]);
-    let block = instructions_block(&config_path);
+    let block = instructions_block(config_path);
     f.render_widget(block, chunks[2]);
     let block = timer_block();
     f.render_widget(block, chunks[3]);
@@ -100,7 +100,7 @@ fn instructions_block(config_path: &str) -> Paragraph<'static> {
             ),
             Span::raw("Edit the Config at "),
             Span::styled(
-                format!("{config_path}"),
+                config_path.to_string(),
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
