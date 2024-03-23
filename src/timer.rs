@@ -89,6 +89,13 @@ impl Timer {
     pub fn expired(&self) -> bool {
         self.start.elapsed() >= self.duration
     }
+
+    /// Reset the timer.
+    ///
+    /// This is called when the user checks in.
+    pub fn reset(&mut self) {
+        self.start = Instant::now();
+    }
 }
 
 /// Formats a duration into a human-readable string adjusting the resolution based on the duration.
