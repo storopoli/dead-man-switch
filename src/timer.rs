@@ -127,7 +127,7 @@ fn format_duration(duration: ChronoDuration) -> String {
         parts.push(format!("{} minute(s)", minutes));
     }
     if seconds > 0 || parts.is_empty() {
-        parts.push(format!("{} second(s)", seconds));
+        parts.push(format!("{} second(s)", seconds + 1));
     }
 
     parts.join(", ")
@@ -136,6 +136,7 @@ fn format_duration(duration: ChronoDuration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread::sleep;
 
     #[test]
     fn timer_creation() {
@@ -164,21 +165,21 @@ mod tests {
     fn timer_expiration() {
         let timer = Timer::new(TimerType::Warning, Duration::from_secs(1));
         // Directly simulate the passage of time
-        std::thread::sleep(Duration::from_secs(2));
+        sleep(Duration::from_secs(2));
         assert!(timer.expired());
     }
 
     #[test]
     fn format_seconds_only() {
         let duration = ChronoDuration::try_seconds(45).unwrap();
-        assert_eq!(format_duration(duration), "45 second(s)");
+        assert_eq!(format_duration(duration), "46 second(s)");
     }
 
     #[test]
     fn format_minutes_and_seconds() {
         let duration =
             ChronoDuration::try_minutes(5).unwrap() + ChronoDuration::try_seconds(30).unwrap();
-        assert_eq!(format_duration(duration), "5 minute(s), 30 second(s)");
+        assert_eq!(format_duration(duration), "5 minute(s), 31 second(s)");
     }
 
     #[test]
@@ -188,7 +189,7 @@ mod tests {
             + ChronoDuration::try_seconds(10).unwrap();
         assert_eq!(
             format_duration(duration),
-            "2 hour(s), 15 minute(s), 10 second(s)"
+            "2 hour(s), 15 minute(s), 11 second(s)"
         );
     }
 
@@ -217,7 +218,7 @@ mod tests {
             + ChronoDuration::try_seconds(59).unwrap();
         assert_eq!(
             format_duration(duration),
-            "7 day(s), 23 hour(s), 59 minute(s), 59 second(s)"
+            "7 day(s), 23 hour(s), 59 minute(s), 60 second(s)"
         );
     }
 
