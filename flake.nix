@@ -35,6 +35,16 @@
         ];
 
         msrv = pkgs.rust-bin.stable."1.63.0".default;
+
+        buildInputs = with pkgs; [
+          bashInteractive
+          msrv
+          openssl
+        ] ++ libsDarwin;
+        nativeBuildInputs = with pkgs;
+          [
+            pkg-config
+          ];
       in
       with pkgs;
       {
@@ -59,17 +69,14 @@
             _shellHook = (self.checks.${system}.pre-commit-check.shellHook or "");
           in
           mkShell {
-            packages = [
-              bashInteractive
-              msrv
-            ] ++ libsDarwin;
+            inherit buildInputs;
 
-            shellHook = "${_shellHook}";
+            shellHook = "${ _shellHook}";
           };
 
-        packages.default = import ./build.nix {
-          inherit (pkgs) lib;
-          rustPlatform = pkgs.rustPlatform;
+        packages. default = import ./build.nix {
+          inherit (pkgs) lib rustPlatform;
+          inherit buildInputs nativeBuildInputs;
           rust = msrv;
         };
 

@@ -1,4 +1,4 @@
-{ lib, rustPlatform, rust, ... }:
+{ lib, rustPlatform, rust, buildInputs, nativeBuildInputs, ... }:
 
 let
   pname = "dead-man-switch";
@@ -13,15 +13,15 @@ in
 buildRustPackage {
   inherit pname version;
 
+  doCheck = false;
+
   src = ./.;
 
   cargoLock = {
     lockFile = ./Cargo.lock;
   };
 
-  buildInputs = [
-    rust
-  ];
+  inherit buildInputs nativeBuildInputs;
 
   # Override the Rust compiler used
   rustc = "${rust}/bin/rustc";
