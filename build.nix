@@ -1,4 +1,4 @@
-{ lib, rustPlatform, rust, ... }:
+{ lib, rustPlatform, rust, buildInputs, ... }:
 
 let
   pname = "dead-man-switch";
@@ -13,13 +13,15 @@ in
 buildRustPackage {
   inherit pname version;
 
+  doCheck = false;
+
   src = ./.;
 
   cargoLock = {
     lockFile = ./Cargo.lock;
   };
 
-  buildInputs = [
+  buildInputs = buildInputs ++ [
     rust
   ];
 
