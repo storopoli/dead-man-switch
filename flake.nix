@@ -39,7 +39,12 @@
         buildInputs = with pkgs; [
           bashInteractive
           msrv
+          openssl
         ] ++ libsDarwin;
+        nativeBuildInputs = with pkgs;
+          [
+            pkg-config
+          ];
       in
       with pkgs;
       {
@@ -70,9 +75,8 @@
           };
 
         packages. default = import ./build.nix {
-          inherit (pkgs) lib;
-          buildInputs = buildInputs;
-          rustPlatform = pkgs.rustPlatform;
+          inherit (pkgs) lib rustPlatform;
+          inherit buildInputs nativeBuildInputs;
           rust = msrv;
         };
 
