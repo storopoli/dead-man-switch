@@ -1,0 +1,31 @@
+{
+  "name": "Rust",
+  "image": "mcr.microsoft.com/devcontainers/base:debian",
+  "features": {
+    // Custom Rust Version
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "1.63.0" // Rust MSRV for the project
+    },
+    // psql command and openssl stuff
+    "ghcr.io/devcontainers-contrib/features/apt-get-packages:1": {
+      "packages": "pkg-config,libssl-dev"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb"
+      ]
+    }
+  },
+
+  // If you need to access the PostgreSQL database from the host machine
+  // "forwardPorts": [],
+
+  // Rootless Docker user
+  "remoteUser": "vscode"
+}
