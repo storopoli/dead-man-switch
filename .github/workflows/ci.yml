@@ -6,7 +6,7 @@ env:
 on:
   push:
     branches:
-    - main
+      - main
   pull_request: {}
   workflow_dispatch: null
 
@@ -14,32 +14,28 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy, rustfmt
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
-    - name: Check
-      run: cargo clippy --all-targets --all-features -- -D warnings
-    - name: rustfmt
-      run: cargo fmt --all --check
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Check
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: rustfmt
+        run: cargo fmt --all --check
 
   check-docs:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
-    - name: cargo doc
-      env:
-        RUSTDOCFLAGS: "-D rustdoc::all -A rustdoc::private-doc-tests"
-      run: cargo doc --all-features --no-deps
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: cargo doc
+        env:
+          RUSTDOCFLAGS: "-D rustdoc::all -A rustdoc::private-doc-tests"
+        run: cargo doc --all-features --no-deps
 
   test-versions:
     needs: check
@@ -48,13 +44,11 @@ jobs:
       matrix:
         rust: [stable, beta, "1.63.0"]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: ${{ matrix.rust }}
-    - name: Rust Cache
-      uses: Swatinem/rust-cache@v2
-    - name: Run tests
-      run: cargo test --all-features --all-targets
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+      - name: Run tests
+        run: cargo test --all-features --all-targets
