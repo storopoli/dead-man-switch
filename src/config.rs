@@ -179,6 +179,8 @@ mod test {
 
     #[test]
     fn test_load_or_initialize_config() {
+        let config = Config::default();
+        save_config(&config).unwrap();
         let config = load_or_initialize_config().unwrap();
         assert_eq!(config, Config::default());
         teardown();
