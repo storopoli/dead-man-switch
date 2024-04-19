@@ -4,10 +4,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: weekly
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
