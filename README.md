@@ -99,6 +99,23 @@ There are several ways to install Dead Man's Switch:
 
    Then `dead-man-switch` will be available as `pkgs.dead-man-switch`;
 
+
+## Using as a Library
+
+Dead Man's Switch can be used as a library.
+This includes all the functions necessary to configure and send emails;
+along with the timers.
+
+To do so you can add the following to your `Cargo.toml`:
+
+```toml
+[dependencies]
+dead-man-switch = { version = "0.2", default-features = false }
+```
+
+Make sure that you're disabling the default features to avoid
+any extra bloat from `ratatui` and `crossterm` dependencies.
+
 ## Minimum Supported Rust Version
 
 This crate uses current Debian stable Rust version as Minimum Supported Rust
