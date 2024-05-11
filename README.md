@@ -75,7 +75,7 @@ There are several ways to install Dead Man's Switch:
    {
      # ...
      inputs.dead-man-switch = {
-       url = "github:storopoli/neovix";
+       url = "github:storopoli/dead-man-switch";
        inputs = {
          nixpkgs.follows = "nixpkgs";
          flake-parts.follows = "flake-parts";
