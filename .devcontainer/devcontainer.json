@@ -23,9 +23,6 @@
     }
   },
 
-  // If you need to access the PostgreSQL database from the host machine
-  // "forwardPorts": [],
-
   // Rootless Docker user
   "remoteUser": "vscode"
 }
