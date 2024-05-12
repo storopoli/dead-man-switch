@@ -138,7 +138,7 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
     // Tries to catch the config path
     let config_path = config_path()?;
     // Tries to create the config file
-    let mut file = File::create(&config_path)?;
+    let mut file = File::create(config_path)?;
     // Tries to serialize the config to a string
     let config = toml::to_string(config)?;
     // Tries to write the config to the file
