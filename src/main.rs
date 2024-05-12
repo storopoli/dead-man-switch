@@ -7,18 +7,24 @@
 //! Check the f****(as in friendly) code.
 
 #[cfg(feature = "tui")]
-use anyhow::Result;
+use thiserror::Error;
+#[derive(Error, Debug)]
+pub enum MainError {
+    #[error("Failed to run everything 😔")]
+    InitingError,
+}
 
 #[cfg(feature = "tui")]
 use dead_man_switch::run;
 
 /// The main function.
 ///
-/// This function eceutes the main loop of the application
+/// This function executes the main loop of the application
 /// by calling the [`run`] function.
 #[cfg(feature = "tui")]
-fn main() -> Result<()> {
-    run()?;
-
-    Ok(())
+fn main() -> Result<(), MainError> {
+    match run() {
+        Ok(_) => Ok(()),
+        Err(_) => Err(MainError::InitingError),
+    }
 }

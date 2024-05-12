@@ -1,9 +1,5 @@
 //! TUI implementation for the Dead Man's Switch.
 
-use std::io;
-use std::time::Duration;
-
-use anyhow::Result;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -17,11 +13,14 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
+use std::io;
+use std::time::Duration;
 
 use crate::{
     config::{config_path, load_or_initialize_config, Email},
     timer::{Timer, TimerType},
 };
+use thiserror::Error;
 
 /// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
@@ -261,16 +260,31 @@ impl Timer {
 ///
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
-pub fn run() -> Result<()> {
+#[derive(Error, Debug)]
+
+pub enum TuiError {
+    #[error("TuiError: {0}")]
+    TuiError(String),
+}
+
+pub fn run() -> Result<(), TuiError> {
     // setup terminal
-    enable_raw_mode()?;
+    enable_raw_mode().map_err(|e| TuiError::TuiError(e.to_string()))?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+        .map_err(|e| TuiError::TuiError(e.to_string()))?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = Terminal::new(backend).map_err(|e| TuiError::TuiError(e.to_string()))?;
 
     // Instantiate the Config
-    let config = load_or_initialize_config()?;
+    let config = match load_or_initialize_config() {
+        Ok(config) => config,
+        Err(_) => {
+            return Err(TuiError::TuiError(
+                stringify!(ConfigError::ReadConfigfile).to_string(),
+            ))
+        }
+    };
 
     // Get config OS-agnostic path
     let config_path = config_path()
@@ -288,11 +302,15 @@ pub fn run() -> Result<()> {
     loop {
         let elapsed = timer.elapsed();
         timer.update(elapsed, config.timer_dead_man);
-        terminal.draw(|f| ui(f, &config_path, &timer))?;
+        terminal
+            .draw(|f| ui(f, &config_path, &timer))
+            .map_err(|e| TuiError::TuiError(e.to_string()))?;
 
         // Poll for events
-        if crossterm::event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
+        if crossterm::event::poll(Duration::from_millis(100))
+            .map_err(|e| TuiError::TuiError(e.to_string()))?
+        {
+            if let Event::Key(key) = event::read().map_err(|e| TuiError::TuiError(e.to_string()))? {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break, // Quit
                     KeyCode::Char('c') => timer.reset(&config), // Check-In
@@ -305,10 +323,14 @@ pub fn run() -> Result<()> {
         if timer.expired() {
             match timer.get_type() {
                 TimerType::Warning => {
-                    config.send_email(Email::Warning)?;
+                    config.send_email(Email::Warning).map_err(|_| {
+                        TuiError::TuiError(stringify!(EmailError::SendError).to_string())
+                    })?;
                 }
                 TimerType::DeadMan => {
-                    config.send_email(Email::DeadMan)?;
+                    config.send_email(Email::DeadMan).map_err(|_| {
+                        TuiError::TuiError(stringify!(EmailError::SendError).to_string())
+                    })?;
                     break;
                 }
             }
@@ -316,13 +338,16 @@ pub fn run() -> Result<()> {
     }
 
     // Restore terminal
-    disable_raw_mode()?;
+    disable_raw_mode().map_err(|e| TuiError::TuiError(e.to_string()))?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    )
+    .map_err(|e| TuiError::TuiError(e.to_string()))?;
+    terminal
+        .show_cursor()
+        .map_err(|e| TuiError::TuiError(e.to_string()))?;
 
     Ok(())
 }

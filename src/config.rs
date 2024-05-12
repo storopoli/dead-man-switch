@@ -1,12 +1,11 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
+use directories_next::BaseDirs;
+use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
-
-use anyhow::Result;
-use directories_next::BaseDirs;
-use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// Configuration struct used for the application
 ///
@@ -90,13 +89,29 @@ pub enum Email {
 /// ## Notes
 ///
 /// This function handles testing and non-testing environments.
-pub fn config_path() -> Result<PathBuf> {
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Failed to get home directory")]
+    HomeDir,
+    #[error("Failed to create config directory")]
+    CreateConfigDir,
+    #[error("Failed to create config file")]
+    CreateConfigFile,
+    #[error("Failed to save config file")]
+    SaveConfigFile,
+    #[error("Failed to read config file")]
+    ReadConfigFile,
+    #[error("Failed to parse config file")]
+    ParseConfigFile,
+}
+
+pub fn config_path() -> Result<PathBuf, ConfigError> {
     let base_dir = if cfg!(test) {
         // Use a temporary directory for tests
         std::env::temp_dir()
     } else {
         BaseDirs::new()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get home directory"))?
+            .ok_or_else(|| ConfigError::HomeDir)?
             .config_dir()
             .to_path_buf()
     };
@@ -120,12 +135,21 @@ pub fn config_path() -> Result<PathBuf> {
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
-pub fn save_config(config: &Config) -> Result<()> {
-    let config_path = config_path()?;
-    let mut file = File::create(config_path)?;
-    let config = toml::to_string(config)?;
-    file.write_all(config.as_bytes())?;
-    Ok(())
+
+pub fn save_config(config: &Config) -> Result<(), ConfigError> {
+    // Tries to catch the config path
+    let config_path = config_path().map_err(|_| ConfigError::CreateConfigDir)?;
+    // Tries to create the config file
+    let mut file = File::create(&config_path).map_err(|_| ConfigError::CreateConfigFile)?;
+    // Tries to serialize the config to a string
+    let config = toml::to_string(config).map_err(|_| ConfigError::SaveConfigFile)?;
+    // Tries to write the config to the file
+    match file.write_all(config.as_bytes()) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            return Err(ConfigError::SaveConfigFile);
+        }
+    }
 }
 
 /// Load the configuration from the OS-agnostic config directory.
@@ -144,15 +168,16 @@ pub fn save_config(config: &Config) -> Result<()> {
 /// use dead_man_switch::config::load_or_initialize_config;
 /// let config = load_or_initialize_config().unwrap();
 /// ```
-pub fn load_or_initialize_config() -> Result<Config> {
+pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
     let config_path = config_path()?;
     if !config_path.exists() {
         let config = Config::default();
         save_config(&config)?;
         Ok(config)
     } else {
-        let config = fs::read_to_string(&config_path)?;
-        let config: Config = toml::from_str(&config)?;
+        // Tries to read the config file
+        let config = fs::read_to_string(&config_path).map_err(|_| ConfigError::ReadConfigFile)?;
+        let config: Config = toml::from_str(&config).map_err(|_| ConfigError::ParseConfigFile)?;
         Ok(config)
     }
 }
