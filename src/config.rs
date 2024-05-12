@@ -97,6 +97,8 @@ pub enum ConfigError {
     CreateConfigDir,
     #[error(transparent)]
     CreateFile(#[from] std::io::Error), 
+    #[error(transparent)]
+    TomlError(#[from] TomlError),  // above: use toml::ser::Error as TomlError;
     #[error("Failed to save config file")]
     SaveConfigFile,
     #[error("Failed to read config file")]
