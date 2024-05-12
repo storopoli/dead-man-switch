@@ -95,8 +95,8 @@ pub enum ConfigError {
     HomeDir,
     #[error("Failed to create config directory")]
     CreateConfigDir,
-    #[error("Failed to create config file")]
-    CreateConfigFile,
+    #[error(transparent)]
+    CreateFile(#[from] std::io::Error), 
     #[error("Failed to save config file")]
     SaveConfigFile,
     #[error("Failed to read config file")]
