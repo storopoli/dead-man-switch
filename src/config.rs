@@ -3,9 +3,11 @@
 use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
-use std::io::prelude::*;
+use std::io::Write;
 use std::path::PathBuf;
 use thiserror::Error;
+use toml::de::Error as DerTomlError;
+use toml::ser::Error as SerTomlError;
 
 /// Configuration struct used for the application
 ///
@@ -91,20 +93,15 @@ pub enum Email {
 /// This function handles testing and non-testing environments.
 #[derive(Error, Debug)]
 pub enum ConfigError {
-    #[error("Failed to get home directory")]
-    HomeDir,
-    #[error("Failed to create config directory")]
-    CreateConfigDir,
+    /// any errors related to IO operations on config module
     #[error(transparent)]
-    CreateFile(#[from] std::io::Error), 
+    IoError(#[from] std::io::Error),
+    /// any errors related to TOML serialization
     #[error(transparent)]
-    TomlError(#[from] TomlError),  // above: use toml::ser::Error as TomlError;
-    #[error("Failed to save config file")]
-    SaveConfigFile,
-    #[error("Failed to read config file")]
-    ReadConfigFile,
-    #[error("Failed to parse config file")]
-    ParseConfigFile,
+    TomlSerError(#[from] SerTomlError),
+    /// any errors related to TOML deserialization
+    #[error(transparent)]
+    TomlDerError(#[from] DerTomlError),
 }
 
 pub fn config_path() -> Result<PathBuf, ConfigError> {
@@ -113,7 +110,7 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
         std::env::temp_dir()
     } else {
         BaseDirs::new()
-            .ok_or_else(|| ConfigError::HomeDir)?
+            .expect("Failed to find home directory")
             .config_dir()
             .to_path_buf()
     };
@@ -137,21 +134,16 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
-
 pub fn save_config(config: &Config) -> Result<(), ConfigError> {
     // Tries to catch the config path
-    let config_path = config_path().map_err(|_| ConfigError::CreateConfigDir)?;
+    let config_path = config_path()?;
     // Tries to create the config file
-    let mut file = File::create(&config_path).map_err(|_| ConfigError::CreateConfigFile)?;
+    let mut file = File::create(&config_path)?;
     // Tries to serialize the config to a string
-    let config = toml::to_string(config).map_err(|_| ConfigError::SaveConfigFile)?;
+    let config = toml::to_string(config)?;
     // Tries to write the config to the file
-    match file.write_all(config.as_bytes()) {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            return Err(ConfigError::SaveConfigFile);
-        }
-    }
+    file.write_all(config.as_bytes())?;
+    Ok(())
 }
 
 /// Load the configuration from the OS-agnostic config directory.
@@ -178,8 +170,8 @@ pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
         Ok(config)
     } else {
         // Tries to read the config file
-        let config = fs::read_to_string(&config_path).map_err(|_| ConfigError::ReadConfigFile)?;
-        let config: Config = toml::from_str(&config).map_err(|_| ConfigError::ParseConfigFile)?;
+        let config = fs::read_to_string(&config_path)?;
+        let config: Config = toml::from_str(&config)?;
         Ok(config)
     }
 }
