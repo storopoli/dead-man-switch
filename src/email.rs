@@ -1,10 +1,16 @@
 //! Email sending capabilities of the Dead Man's Switch.
 
-use std::{fs, str::FromStr};
+use std::{fs, io::Error as IoError, str::FromStr};
 
 use lettre::{
-    message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart},
+    address::AddressError,
+    error::Error as LtreError,
+    message::{
+        header::{ContentType, ContentTypeErr},
+        Attachment, Mailbox, MultiPart, SinglePart,
+    },
     transport::smtp::{
+        self,
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
@@ -16,12 +22,16 @@ use crate::config::{Config, Email};
 
 #[derive(Error, Debug)]
 pub enum EmailError {
-    #[error("Failed to send email")]
-    SendError,
-    #[error("Failed to create email")]
-    CreateError,
-    #[error("Failed to read attachment")]
-    ReadError,
+    #[error(transparent)]
+    TlsError(#[from] smtp::Error),
+    #[error(transparent)]
+    EmailError(#[from] AddressError),
+    #[error(transparent)]
+    BuilderError(#[from] LtreError),
+    #[error(transparent)]
+    IoError(#[from] IoError),
+    #[error(transparent)]
+    InvalidContent(#[from] ContentTypeErr),
 }
 
 impl Config {
@@ -42,34 +52,28 @@ impl Config {
 
         // SMTP client setup
         let creds = Credentials::new(self.username.clone(), self.password.clone());
-        let tls = TlsParameters::new_rustls(self.smtp_server.clone())
-            .map_err(|_| EmailError::SendError)?;
+        let tls = TlsParameters::new_rustls(self.smtp_server.clone())?;
         let mailer = SmtpTransport::relay(&self.smtp_server)
-            .map_err(|_| EmailError::SendError)?
+            .expect("Failed to create transport")
             .port(self.smtp_port)
             .credentials(creds)
             .tls(Tls::Required(tls))
             .build();
 
         //Tries to Send the email
-        match mailer.send(&email) {
-            Ok(_) => Ok(()),
-            Err(_) => return Err(EmailError::SendError),
-        }
+        mailer.send(&email)?;
+        Ok(())
     }
     /// Create the email to send.
     ///
     /// If an attachment is provided, the email will be created with the attachment.
     fn create_email(&self, email_type: Email) -> Result<Message, EmailError> {
         // Guaranteed config values
-        let from = Mailbox::new(
-            None,
-            self.from.parse().map_err(|_| EmailError::CreateError)?,
-        );
+        let from = Mailbox::new(None, self.from.parse()?);
         // Adjust the email to based on the email type
         let to = match email_type {
-            Email::Warning => Address::from_str(&self.from).map_err(|_| EmailError::CreateError)?,
-            Email::DeadMan => Address::from_str(&self.to).map_err(|_| EmailError::CreateError)?,
+            Email::Warning => Address::from_str(&self.from)?,
+            Email::DeadMan => Address::from_str(&self.to)?,
         };
         let to = Mailbox::new(None, to);
 
@@ -94,37 +98,32 @@ impl Config {
             if let Some(attachment) = &self.attachment {
                 let filename = attachment
                     .file_name()
-                    .ok_or_else(|| EmailError::ReadError)?
+                    .expect("Failed to get filename")
                     .to_string_lossy();
-                let filebody = fs::read(attachment).map_err(|_| EmailError::ReadError)?;
+                let filebody = fs::read(attachment)?;
                 let content_type = ContentType::parse(
                     mime_guess::from_path(attachment)
                         .first_or_octet_stream()
                         .as_ref(),
-                )
-                .map_err(|_| EmailError::ReadError)?;
+                )?;
 
                 // Create the attachment part
                 let attachment_part =
                     Attachment::new(filename.to_string()).body(filebody, content_type);
 
                 // Construct and return the email with the attachment
-                let email = email_builder
-                    .multipart(
-                        MultiPart::mixed()
-                            .singlepart(text_part)
-                            .singlepart(attachment_part),
-                    )
-                    .map_err(|_| EmailError::CreateError)?;
+                let email = email_builder.multipart(
+                    MultiPart::mixed()
+                        .singlepart(text_part)
+                        .singlepart(attachment_part),
+                )?;
                 return Ok(email);
             }
         }
 
         // For Warning email type or DeadMan without an attachment
-        match email_builder.singlepart(text_part) {
-            Ok(email) => Ok(email),
-            Err(_) => Err(EmailError::CreateError),
-        }
+        let email = email_builder.singlepart(text_part)?;
+        Ok(email)
     }
 }
 
