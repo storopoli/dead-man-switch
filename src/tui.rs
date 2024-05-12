@@ -17,7 +17,8 @@ use std::io;
 use std::time::Duration;
 
 use crate::{
-    config::{config_path, load_or_initialize_config, Email},
+    config::{config_path, load_or_initialize_config, ConfigError, Email},
+    email::EmailError,
     timer::{Timer, TimerType},
 };
 use thiserror::Error;
@@ -263,28 +264,24 @@ impl Timer {
 #[derive(Error, Debug)]
 
 pub enum TuiError {
-    #[error("TuiError: {0}")]
-    TuiError(String),
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+    #[error(transparent)]
+    ConfigError(#[from] ConfigError),
+    #[error(transparent)]
+    EmailError(#[from] EmailError),
 }
 
 pub fn run() -> Result<(), TuiError> {
     // setup terminal
-    enable_raw_mode().map_err(|e| TuiError::TuiError(e.to_string()))?;
+    enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
-        .map_err(|e| TuiError::TuiError(e.to_string()))?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).map_err(|e| TuiError::TuiError(e.to_string()))?;
+    let mut terminal = Terminal::new(backend)?;
 
     // Instantiate the Config
-    let config = match load_or_initialize_config() {
-        Ok(config) => config,
-        Err(_) => {
-            return Err(TuiError::TuiError(
-                stringify!(ConfigError::ReadConfigfile).to_string(),
-            ))
-        }
-    };
+    let config = load_or_initialize_config()?;
 
     // Get config OS-agnostic path
     let config_path = config_path()
@@ -302,15 +299,11 @@ pub fn run() -> Result<(), TuiError> {
     loop {
         let elapsed = timer.elapsed();
         timer.update(elapsed, config.timer_dead_man);
-        terminal
-            .draw(|f| ui(f, &config_path, &timer))
-            .map_err(|e| TuiError::TuiError(e.to_string()))?;
+        terminal.draw(|f| ui(f, &config_path, &timer))?;
 
         // Poll for events
-        if crossterm::event::poll(Duration::from_millis(100))
-            .map_err(|e| TuiError::TuiError(e.to_string()))?
-        {
-            if let Event::Key(key) = event::read().map_err(|e| TuiError::TuiError(e.to_string()))? {
+        if crossterm::event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break, // Quit
                     KeyCode::Char('c') => timer.reset(&config), // Check-In
@@ -323,14 +316,10 @@ pub fn run() -> Result<(), TuiError> {
         if timer.expired() {
             match timer.get_type() {
                 TimerType::Warning => {
-                    config.send_email(Email::Warning).map_err(|_| {
-                        TuiError::TuiError(stringify!(EmailError::SendError).to_string())
-                    })?;
+                    config.send_email(Email::Warning)?;
                 }
                 TimerType::DeadMan => {
-                    config.send_email(Email::DeadMan).map_err(|_| {
-                        TuiError::TuiError(stringify!(EmailError::SendError).to_string())
-                    })?;
+                    config.send_email(Email::DeadMan)?;
                     break;
                 }
             }
@@ -338,16 +327,13 @@ pub fn run() -> Result<(), TuiError> {
     }
 
     // Restore terminal
-    disable_raw_mode().map_err(|e| TuiError::TuiError(e.to_string()))?;
+    disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
-    )
-    .map_err(|e| TuiError::TuiError(e.to_string()))?;
-    terminal
-        .show_cursor()
-        .map_err(|e| TuiError::TuiError(e.to_string()))?;
+    )?;
+    terminal.show_cursor()?;
 
     Ok(())
 }
