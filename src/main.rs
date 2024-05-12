@@ -6,12 +6,13 @@
 //! Use at your own risk.
 //! Check the f****(as in friendly) code.
 
+use dead_man_switch::tui::TuiError;
 #[cfg(feature = "tui")]
 use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum MainError {
-    #[error("Failed to run everything 😔")]
-    InitingError,
+    #[error("Failed to run everything 😔: '{0}'")]
+    TuiError(#[from] TuiError),
 }
 
 #[cfg(feature = "tui")]
@@ -23,8 +24,6 @@ use dead_man_switch::run;
 /// by calling the [`run`] function.
 #[cfg(feature = "tui")]
 fn main() -> Result<(), MainError> {
-    match run() {
-        Ok(_) => Ok(()),
-        Err(_) => Err(MainError::InitingError),
-    }
+    run()?;
+    Ok(())
 }
