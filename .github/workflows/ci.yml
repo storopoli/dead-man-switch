@@ -51,4 +51,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - name: Run tests
-        run: cargo test --all-features --all-targets
+        run: |
+          # Cleanup any previous deadman configuration
+          rm -rf $XDG_CONFIG_HOME/deadman
+          cargo test --all-features --all-targets
