@@ -1,6 +1,6 @@
 [package]
 name = "dead-man-switch"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Jose Storopoli <jose@storopoli.io>"]
 description = "A simple no-BS Dead Man's Switch"
