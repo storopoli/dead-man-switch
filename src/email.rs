@@ -1,18 +1,46 @@
 //! Email sending capabilities of the Dead Man's Switch.
 
-use std::{fs, str::FromStr};
+use std::fs;
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::str::FromStr;
 
-use anyhow::Result;
 use lettre::{
-    message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart},
+    address::AddressError,
+    error::Error as LettreError,
+    message::{
+        header::{ContentType, ContentTypeErr},
+        Attachment, Mailbox, MultiPart, SinglePart,
+    },
     transport::smtp::{
+        self,
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
     Address, Message, SmtpTransport, Transport,
 };
+use thiserror::Error;
 
 use crate::config::{Config, Email};
+
+/// Errors that can occur when sending an email.
+#[derive(Error, Debug)]
+pub enum EmailError {
+    /// TLS error when sending the email.
+    #[error(transparent)]
+    TlsError(#[from] smtp::Error),
+    /// Error when parsing email addresses.
+    #[error(transparent)]
+    EmailError(#[from] AddressError),
+    /// Error when building the email.
+    #[error(transparent)]
+    BuilderError(#[from] LettreError),
+    /// Error when reading the attachment.
+    #[error(transparent)]
+    IoError(#[from] IoError),
+    /// Error when determining the content type of the attachment.
+    #[error(transparent)]
+    InvalidContent(#[from] ContentTypeErr),
+}
 
 impl Config {
     /// Send the email using the provided configuration.
@@ -27,7 +55,7 @@ impl Config {
     ///
     /// If the attachment MIME type cannot be determined, it will default to
     /// `application/octet-stream`.
-    pub fn send_email(&self, email_type: Email) -> Result<()> {
+    pub fn send_email(&self, email_type: Email) -> Result<(), EmailError> {
         let email = self.create_email(email_type)?;
 
         // SMTP client setup
@@ -41,14 +69,12 @@ impl Config {
 
         // Send the email
         mailer.send(&email)?;
-
         Ok(())
     }
-
     /// Create the email to send.
     ///
     /// If an attachment is provided, the email will be created with the attachment.
-    fn create_email(&self, email_type: Email) -> Result<Message> {
+    fn create_email(&self, email_type: Email) -> Result<Message, EmailError> {
         // Guaranteed config values
         let from = Mailbox::new(None, self.from.parse()?);
         // Adjust the email to based on the email type
@@ -79,7 +105,7 @@ impl Config {
             if let Some(attachment) = &self.attachment {
                 let filename = attachment
                     .file_name()
-                    .ok_or_else(|| anyhow::anyhow!("Failed to get filename"))?
+                    .ok_or_else(|| IoError::new(IoErrorKind::NotFound, "Failed to get filename"))?
                     .to_string_lossy();
                 let filebody = fs::read(attachment)?;
                 let content_type = ContentType::parse(

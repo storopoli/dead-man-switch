@@ -3,7 +3,6 @@
 use std::io;
 use std::time::Duration;
 
-use anyhow::Result;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -17,9 +16,11 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
+use thiserror::Error;
 
 use crate::{
-    config::{config_path, load_or_initialize_config, Email},
+    config::{config_path, load_or_initialize_config, ConfigError, Email},
+    email::EmailError,
     timer::{Timer, TimerType},
 };
 
@@ -257,11 +258,26 @@ impl Timer {
     }
 }
 
+/// TUI Error type.
+#[derive(Error, Debug)]
+
+pub enum TuiError {
+    /// IO Error.
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+    /// [`ConfigError`] blanket error conversion.
+    #[error(transparent)]
+    ConfigError(#[from] ConfigError),
+    /// [`EmailError`] blanket error conversion.
+    #[error(transparent)]
+    EmailError(#[from] EmailError),
+}
+
 /// Run the TUI.
 ///
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
-pub fn run() -> Result<()> {
+pub fn run() -> Result<(), TuiError> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -273,10 +289,7 @@ pub fn run() -> Result<()> {
     let config = load_or_initialize_config()?;
 
     // Get config OS-agnostic path
-    let config_path = config_path()
-        .expect("Failed to get config path")
-        .to_string_lossy()
-        .to_string();
+    let config_path = config_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
     let mut timer = Timer::new(

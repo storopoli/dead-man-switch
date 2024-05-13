@@ -1,12 +1,13 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
 use std::fs::{self, File};
-use std::io::prelude::*;
+use std::io::Write;
 use std::path::PathBuf;
 
-use anyhow::Result;
 use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
 
 /// Configuration struct used for the application
 ///
@@ -68,6 +69,20 @@ impl Default for Config {
     }
 }
 
+/// Configuration errors
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    /// IO operations on config module
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
+    /// TOML serialization
+    #[error(transparent)]
+    TomlSerError(#[from] SerTomlError),
+    /// TOML deserialization
+    #[error(transparent)]
+    TomlDerError(#[from] DerTomlError),
+}
+
 /// Enum to represent the type of email to send.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Email {
@@ -90,13 +105,13 @@ pub enum Email {
 /// ## Notes
 ///
 /// This function handles testing and non-testing environments.
-pub fn config_path() -> Result<PathBuf> {
+pub fn config_path() -> Result<PathBuf, ConfigError> {
     let base_dir = if cfg!(test) {
         // Use a temporary directory for tests
         std::env::temp_dir()
     } else {
         BaseDirs::new()
-            .ok_or_else(|| anyhow::anyhow!("Failed to get home directory"))?
+            .expect("Failed to find home directory")
             .config_dir()
             .to_path_buf()
     };
@@ -120,11 +135,13 @@ pub fn config_path() -> Result<PathBuf> {
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
-pub fn save_config(config: &Config) -> Result<()> {
+pub fn save_config(config: &Config) -> Result<(), ConfigError> {
     let config_path = config_path()?;
     let mut file = File::create(config_path)?;
     let config = toml::to_string(config)?;
+
     file.write_all(config.as_bytes())?;
+
     Ok(())
 }
 
@@ -144,15 +161,17 @@ pub fn save_config(config: &Config) -> Result<()> {
 /// use dead_man_switch::config::load_or_initialize_config;
 /// let config = load_or_initialize_config().unwrap();
 /// ```
-pub fn load_or_initialize_config() -> Result<Config> {
+pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
     let config_path = config_path()?;
     if !config_path.exists() {
         let config = Config::default();
         save_config(&config)?;
+
         Ok(config)
     } else {
         let config = fs::read_to_string(&config_path)?;
         let config: Config = toml::from_str(&config)?;
+
         Ok(config)
     }
 }

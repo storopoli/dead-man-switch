@@ -6,19 +6,17 @@
 //! Use at your own risk.
 //! Check the f****(as in friendly) code.
 
-#[cfg(feature = "tui")]
-use anyhow::Result;
+use std::error::Error;
 
 #[cfg(feature = "tui")]
 use dead_man_switch::run;
 
 /// The main function.
 ///
-/// This function eceutes the main loop of the application
+/// This function executes the main loop of the application
 /// by calling the [`run`] function.
 #[cfg(feature = "tui")]
-fn main() -> Result<()> {
+fn main() -> Result<(), Box<dyn Error>> {
     run()?;
-
     Ok(())
 }
