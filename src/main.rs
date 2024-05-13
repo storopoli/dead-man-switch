@@ -6,14 +6,7 @@
 //! Use at your own risk.
 //! Check the f****(as in friendly) code.
 
-use dead_man_switch::tui::TuiError;
-#[cfg(feature = "tui")]
-use thiserror::Error;
-#[derive(Error, Debug)]
-pub enum MainError {
-    #[error("Failed to run everything 😔: '{0}'")]
-    TuiError(#[from] TuiError),
-}
+use std::error::Error;
 
 #[cfg(feature = "tui")]
 use dead_man_switch::run;
@@ -23,7 +16,7 @@ use dead_man_switch::run;
 /// This function executes the main loop of the application
 /// by calling the [`run`] function.
 #[cfg(feature = "tui")]
-fn main() -> Result<(), MainError> {
+fn main() -> Result<(), Box<dyn Error>> {
     run()?;
     Ok(())
 }
