@@ -1,10 +1,12 @@
 //! Email sending capabilities of the Dead Man's Switch.
 
-use std::{fs, io::Error as IoError, str::FromStr};
+use std::fs;
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::str::FromStr;
 
 use lettre::{
     address::AddressError,
-    error::Error as LtreError,
+    error::Error as LettreError,
     message::{
         header::{ContentType, ContentTypeErr},
         Attachment, Mailbox, MultiPart, SinglePart,
@@ -20,16 +22,22 @@ use thiserror::Error;
 
 use crate::config::{Config, Email};
 
+/// Errors that can occur when sending an email.
 #[derive(Error, Debug)]
 pub enum EmailError {
+    /// TLS error when sending the email.
     #[error(transparent)]
     TlsError(#[from] smtp::Error),
+    /// Error when parsing email addresses.
     #[error(transparent)]
     EmailError(#[from] AddressError),
+    /// Error when building the email.
     #[error(transparent)]
-    BuilderError(#[from] LtreError),
+    BuilderError(#[from] LettreError),
+    /// Error when reading the attachment.
     #[error(transparent)]
     IoError(#[from] IoError),
+    /// Error when determining the content type of the attachment.
     #[error(transparent)]
     InvalidContent(#[from] ContentTypeErr),
 }
@@ -60,7 +68,7 @@ impl Config {
             .tls(Tls::Required(tls))
             .build();
 
-        //Tries to Send the email
+        // Send the email
         mailer.send(&email)?;
         Ok(())
     }

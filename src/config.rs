@@ -1,13 +1,13 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
-use directories_next::BaseDirs;
-use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+
+use directories_next::BaseDirs;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use toml::de::Error as DerTomlError;
-use toml::ser::Error as SerTomlError;
+use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
 
 /// Configuration struct used for the application
 ///
@@ -69,6 +69,20 @@ impl Default for Config {
     }
 }
 
+/// Configuration errors
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    /// IO operations on config module
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
+    /// TOML serialization
+    #[error(transparent)]
+    TomlSerError(#[from] SerTomlError),
+    /// TOML deserialization
+    #[error(transparent)]
+    TomlDerError(#[from] DerTomlError),
+}
+
 /// Enum to represent the type of email to send.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Email {
@@ -91,19 +105,6 @@ pub enum Email {
 /// ## Notes
 ///
 /// This function handles testing and non-testing environments.
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    /// any errors related to IO operations on config module
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    /// any errors related to TOML serialization
-    #[error(transparent)]
-    TomlSerError(#[from] SerTomlError),
-    /// any errors related to TOML deserialization
-    #[error(transparent)]
-    TomlDerError(#[from] DerTomlError),
-}
-
 pub fn config_path() -> Result<PathBuf, ConfigError> {
     let base_dir = if cfg!(test) {
         // Use a temporary directory for tests
@@ -135,14 +136,12 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
 pub fn save_config(config: &Config) -> Result<(), ConfigError> {
-    // Tries to catch the config path
     let config_path = config_path()?;
-    // Tries to create the config file
     let mut file = File::create(config_path)?;
-    // Tries to serialize the config to a string
     let config = toml::to_string(config)?;
-    // Tries to write the config to the file
+
     file.write_all(config.as_bytes())?;
+
     Ok(())
 }
 
@@ -167,11 +166,12 @@ pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
     if !config_path.exists() {
         let config = Config::default();
         save_config(&config)?;
+
         Ok(config)
     } else {
-        // Tries to read the config file
         let config = fs::read_to_string(&config_path)?;
         let config: Config = toml::from_str(&config)?;
+
         Ok(config)
     }
 }

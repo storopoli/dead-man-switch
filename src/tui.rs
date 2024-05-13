@@ -1,5 +1,8 @@
 //! TUI implementation for the Dead Man's Switch.
 
+use std::io;
+use std::time::Duration;
+
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -13,15 +16,13 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
-use std::io;
-use std::time::Duration;
+use thiserror::Error;
 
 use crate::{
     config::{config_path, load_or_initialize_config, ConfigError, Email},
     email::EmailError,
     timer::{Timer, TimerType},
 };
-use thiserror::Error;
 
 /// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
@@ -257,21 +258,25 @@ impl Timer {
     }
 }
 
-/// Run the TUI.
-///
-/// This function will setup the terminal, run the main loop, and then
-/// restore the terminal.
+/// TUI Error type.
 #[derive(Error, Debug)]
 
 pub enum TuiError {
+    /// IO Error.
     #[error(transparent)]
     IoError(#[from] io::Error),
+    /// [`ConfigError`] blanket error conversion.
     #[error(transparent)]
     ConfigError(#[from] ConfigError),
+    /// [`EmailError`] blanket error conversion.
     #[error(transparent)]
     EmailError(#[from] EmailError),
 }
 
+/// Run the TUI.
+///
+/// This function will setup the terminal, run the main loop, and then
+/// restore the terminal.
 pub fn run() -> Result<(), TuiError> {
     // setup terminal
     enable_raw_mode()?;
