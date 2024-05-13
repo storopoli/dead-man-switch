@@ -61,8 +61,7 @@ impl Config {
         // SMTP client setup
         let creds = Credentials::new(self.username.clone(), self.password.clone());
         let tls = TlsParameters::new_rustls(self.smtp_server.clone())?;
-        let mailer = SmtpTransport::relay(&self.smtp_server)
-            .expect("Failed to create transport")
+        let mailer = SmtpTransport::relay(&self.smtp_server)?
             .port(self.smtp_port)
             .credentials(creds)
             .tls(Tls::Required(tls))
@@ -106,7 +105,7 @@ impl Config {
             if let Some(attachment) = &self.attachment {
                 let filename = attachment
                     .file_name()
-                    .expect("Failed to get filename")
+                    .ok_or_else(|| IoError::new(IoErrorKind::NotFound, "Failed to get filename"))?
                     .to_string_lossy();
                 let filebody = fs::read(attachment)?;
                 let content_type = ContentType::parse(

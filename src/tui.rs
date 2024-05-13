@@ -289,10 +289,7 @@ pub fn run() -> Result<(), TuiError> {
     let config = load_or_initialize_config()?;
 
     // Get config OS-agnostic path
-    let config_path = config_path()
-        .expect("Failed to get config path")
-        .to_string_lossy()
-        .to_string();
+    let config_path = config_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
     let mut timer = Timer::new(
