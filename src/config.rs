@@ -21,6 +21,8 @@ pub struct Config {
     pub username: String,
     /// The password for the email account.
     pub password: String,
+    /// The directory of the config file
+    pub directory: Option<PathBuf>,
     /// The SMTP server to use
     pub smtp_server: String,
     /// The port to use for the SMTP server.
@@ -54,6 +56,7 @@ impl Default for Config {
         Self {
             username: "me@example.com".to_string(),
             password: "".to_string(),
+            directory: None, //When defining none, it will use the default directory.
             smtp_server: "smtp.example.com".to_string(),
             smtp_port: 587,
             message: "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case.".to_string(),
@@ -91,117 +94,150 @@ pub enum Email {
     /// Send the dead man's email.
     DeadMan,
 }
+impl Config {
+    /// Load the configuration from the OS-agnostic config directory or from provided directory.
+    ///
+    /// Under the hood uses the [`directories_next`] crate to find the
+    /// home directory and the config.
+    ///
+    /// ## Errors
+    ///
+    /// - Fails if the home directory cannot be found
+    /// - Fails if the config directory cannot be created
+    ///
+    /// ## Notes
+    ///
+    /// This function handles testing and non-testing environments.
+    pub fn config_path(self) -> Result<PathBuf, ConfigError> {
+        let base_dir = if cfg!(test) {
+            // Use a temporary directory for tests
+            let config_dir = std::env::temp_dir().join("deadman_test");
 
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
-///
-/// ## Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
-///
-/// ## Notes
-///
-/// This function handles testing and non-testing environments.
-pub fn config_path() -> Result<PathBuf, ConfigError> {
-    let base_dir = if cfg!(test) {
-        // Use a temporary directory for tests
-        std::env::temp_dir()
-    } else {
-        BaseDirs::new()
-            .expect("Failed to find home directory")
-            .config_dir()
-            .to_path_buf()
-    };
+            fs::create_dir_all(&config_dir).expect("Failed to create config directory");
+            config_dir.join("config.toml")
+        } else {
+            if self.directory.is_none() {
+                let config_dir = BaseDirs::new()
+                    .expect("Failed to find home directory")
+                    .config_dir()
+                    .to_path_buf()
+                    .join("deadman");
 
-    let config_dir = base_dir.join(if cfg!(test) {
-        "deadman_test"
-    } else {
-        "deadman"
-    });
+                fs::create_dir_all(&config_dir).expect("Failed to create config directory");
+                config_dir.join("config.toml")
+            } else {
+                self.directory.clone().unwrap()
+            }
+        };
+        Ok(base_dir)
+    }
 
-    fs::create_dir_all(&config_dir).expect("Failed to create config directory");
-    Ok(config_dir.join("config.toml"))
-}
+    /// Save the configuration to the OS-agnostic config directory.
+    ///
+    /// Under the hood uses the [`directories_next`] crate to find the
+    /// home directory and the config.
+    ///
+    /// ## Errors
+    ///
+    /// - Fails if the home directory cannot be found
+    /// - Fails if the config directory cannot be created
+    pub fn save_config(self, config: &Config) -> Result<(), ConfigError> {
+        let path = self.config_path()?;
+        let mut file = match path.is_file() {
+            true => File::open(path)?,
+            false => File::create(path)?,
+        };
+        let config = toml::to_string(config)?;
 
-/// Save the configuration to the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
-///
-/// ## Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
-pub fn save_config(config: &Config) -> Result<(), ConfigError> {
-    let config_path = config_path()?;
-    let mut file = File::create(config_path)?;
-    let config = toml::to_string(config)?;
+        file.write_all(config.as_bytes())?;
 
-    file.write_all(config.as_bytes())?;
+        Ok(())
+    }
 
-    Ok(())
-}
+    pub fn check_path(self, provided_path: Option<PathBuf>) -> Result<PathBuf, ConfigError> {
+        if provided_path.is_none() {
+            _ = File::open(&self.config_path()?);
+            Ok(self.config_path()?)
+        } else {
+            let path = provided_path.unwrap();
+            if path.is_dir() {
+                let path = path.join("config.toml");
+                //tries to open it
+                _ = File::open(&path)?;
+                Ok(path)
+            } else {
+                //tries to open it
+                _ = File::open(&path)?;
+                Ok(path)
+            }
+        }
+    }
 
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
-///
-/// ## Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
-///
-/// ## Example
-///
-/// ```rust
-/// use dead_man_switch::config::load_or_initialize_config;
-/// let config = load_or_initialize_config().unwrap();
-/// ```
-pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
-    let config_path = config_path()?;
-    if !config_path.exists() {
-        let config = Config::default();
-        save_config(&config)?;
+    /// Load the configuration from the OS-agnostic config directory.
+    ///
+    /// Under the hood uses the [`directories_next`] crate to find the
+    /// home directory and the config.
+    ///
+    /// ## Errors
+    ///
+    /// - Fails if the home directory cannot be found
+    /// - Fails if the config directory cannot be created
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// use dead_man_switch::config::load_or_initialize_config;
+    /// let config = load_or_initialize_config().unwrap();
+    /// ```
+    pub fn load_or_initialize_config(
+        self,
+        provided_path: Option<PathBuf>,
+    ) -> Result<Config, ConfigError> {
+        if provided_path.is_none() || self.directory.is_none() {
+            let config = Config::default();
+            self.directory = Some(self.config_path()?);
+            self.save_config(&config)?;
 
-        Ok(config)
-    } else {
-        let config = fs::read_to_string(&config_path)?;
-        let config: Config = toml::from_str(&config)?;
+            Ok(config)
+        } else {
+            self.directory = Some(self.check_path(provided_path)?);
+            let config_path = self.config_path()?;
+            let config = fs::read_to_string(&config_path)?;
+            let config: Config = toml::from_str(&config)?;
 
-        Ok(config)
+            Ok(config)
+        }
     }
 }
-
 #[cfg(test)]
 mod test {
     use super::*;
 
-    fn teardown() {
+    fn teardown(instance: Config) {
         // Cleanup test config file after each test to prevent state leakage
-        let _ = fs::remove_file(config_path().unwrap());
+        let _ = fs::remove_file(instance.config_path().unwrap());
     }
 
     #[test]
     fn test_save_config() {
-        let config = Config::default();
-        save_config(&config).unwrap();
-        let config_path = config_path().unwrap();
+        let instance = Config::default();
+        let config = instance.load_or_initialize_config(None).unwrap();
+        let config_path = instance.config_path().unwrap();
+        instance.save_config(&config).unwrap();
+
         let config = fs::read_to_string(config_path).unwrap();
         let config: Config = toml::from_str(&config).unwrap();
         assert_eq!(config, Config::default());
-        teardown();
+        teardown(instance);
     }
 
     #[test]
     fn test_load_or_initialize_config() {
-        let config = Config::default();
-        save_config(&config).unwrap();
-        let config = load_or_initialize_config().unwrap();
+        let instance = Config::default();
+        let config_path = instance.config_path().unwrap();
+        instance.save_config(&instance).unwrap();
+        let config = instance.load_or_initialize_config(None).unwrap();
         assert_eq!(config, Config::default());
-        teardown();
+        teardown(instance);
     }
 }
