@@ -1,23 +1,19 @@
 use clap::Parser;
-use thiserror::Error;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct CliArgs {
-    #[arg(short, long)]
-    ConfigPath: Option<PathBuff>,
+#[clap(version, about, long_about = None)]
+pub struct CliArgs {
+    #[clap(short, long)]
+    pub config_path: Option<PathBuf>,
 }
 
-#[derive(Error, Debug)]
-pub enum CliErrors {
-    /// IO operations on cli module
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
+pub enum CliCommand {
+    ConfigPath(PathBuf),
 }
-pub fn check_args() -> Result<(), CliErrors> {
+///This function checks for any commands passed to the program.
+///Return the arguments passed to the program if any.
+pub fn check_args() -> Option<CliArgs> {
     let args = CliArgs::parse();
-    if !args.ConfigPath.is_none() {
-        
-    }
-    return Ok();
+    return Some(args);
 }

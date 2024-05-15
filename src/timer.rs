@@ -135,8 +135,9 @@ fn format_duration(duration: ChronoDuration) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::Config;
+
     use super::*;
-    use crate::config::load_or_initialize_config;
     use std::thread::sleep;
 
     #[test]
@@ -225,7 +226,8 @@ mod tests {
 
     #[test]
     fn reset_warning_timer_resets_start_time() {
-        let config = load_or_initialize_config().unwrap();
+        let instance = Config::default();
+        let config = instance.load_or_initialize_config(None).unwrap();
 
         let mut timer = Timer::new(
             TimerType::Warning,
@@ -242,7 +244,8 @@ mod tests {
 
     #[test]
     fn reset_dead_man_timer_promotes_to_warning_and_resets() {
-        let config = load_or_initialize_config().unwrap();
+        let instance = Config::default();
+        let config = instance.load_or_initialize_config(None).unwrap();
 
         let mut timer = Timer::new(
             TimerType::DeadMan,

@@ -1,5 +1,7 @@
 //! TUI implementation for the Dead Man's Switch.
 
+#[cfg(feature = "cli")]
+use crate::cli::check_args;
 use std::io;
 use std::time::Duration;
 
@@ -19,7 +21,7 @@ use ratatui::{
 use thiserror::Error;
 
 use crate::{
-    config::{config_path, load_or_initialize_config, ConfigError, Email},
+    config::{Config, ConfigError, Email},
     email::EmailError,
     timer::{Timer, TimerType},
 };
@@ -284,12 +286,28 @@ pub fn run() -> Result<(), TuiError> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    #[cfg(feature = "cli")]
+    // check for any cli commands
+    let args = check_args();
+
+    #[cfg(not(feature = "cli"))]
+    let args = None;
 
     // Instantiate the Config
-    let config = load_or_initialize_config()?;
-
+    let config_instance = Config::default();
+    //loads the default config if cli is not used
+    let config = config_instance.clone().load_or_initialize_config(None)?;
+    if args.is_some() {
+        let config = config_instance
+            .clone()
+            .load_or_initialize_config(args.unwrap().config_path)?;
+    }
     // Get config OS-agnostic path
-    let config_path = config_path()?.to_string_lossy().to_string();
+    let config_path = config_instance
+        .clone()
+        .config_path()?
+        .to_string_lossy()
+        .to_string();
 
     // Create a new Timer
     let mut timer = Timer::new(

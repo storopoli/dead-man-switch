@@ -50,7 +50,6 @@ pub struct Config {
     /// Timer in seconds for the dead man's email.
     pub timer_dead_man: u64,
 }
-
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -141,8 +140,8 @@ impl Config {
     ///
     /// - Fails if the home directory cannot be found
     /// - Fails if the config directory cannot be created
-    pub fn save_config(self, config: &Config) -> Result<(), ConfigError> {
-        let path = self.config_path()?;
+    pub fn save_config(&self, config: &Config) -> Result<(), ConfigError> {
+        let path = self.clone().config_path()?;
         let mut file = match path.is_file() {
             true => File::open(path)?,
             false => File::create(path)?,
@@ -156,7 +155,7 @@ impl Config {
 
     pub fn check_path(self, provided_path: Option<PathBuf>) -> Result<PathBuf, ConfigError> {
         if provided_path.is_none() {
-            _ = File::open(&self.config_path()?);
+            _ = File::open(&self.clone().config_path()?);
             Ok(self.config_path()?)
         } else {
             let path = provided_path.unwrap();
@@ -190,17 +189,17 @@ impl Config {
     /// let config = load_or_initialize_config().unwrap();
     /// ```
     pub fn load_or_initialize_config(
-        self,
+        mut self,
         provided_path: Option<PathBuf>,
     ) -> Result<Config, ConfigError> {
         if provided_path.is_none() || self.directory.is_none() {
             let config = Config::default();
-            self.directory = Some(self.config_path()?);
+            self.directory = Some(self.clone().config_path()?);
             self.save_config(&config)?;
 
             Ok(config)
         } else {
-            self.directory = Some(self.check_path(provided_path)?);
+            self.directory = Some(self.clone().check_path(provided_path)?);
             let config_path = self.config_path()?;
             let config = fs::read_to_string(&config_path)?;
             let config: Config = toml::from_str(&config)?;
@@ -221,8 +220,8 @@ mod test {
     #[test]
     fn test_save_config() {
         let instance = Config::default();
-        let config = instance.load_or_initialize_config(None).unwrap();
-        let config_path = instance.config_path().unwrap();
+        let config = instance.clone().load_or_initialize_config(None).unwrap();
+        let config_path = instance.clone().config_path().unwrap();
         instance.save_config(&config).unwrap();
 
         let config = fs::read_to_string(config_path).unwrap();
@@ -234,9 +233,8 @@ mod test {
     #[test]
     fn test_load_or_initialize_config() {
         let instance = Config::default();
-        let config_path = instance.config_path().unwrap();
         instance.save_config(&instance).unwrap();
-        let config = instance.load_or_initialize_config(None).unwrap();
+        let config = instance.clone().load_or_initialize_config(None).unwrap();
         assert_eq!(config, Config::default());
         teardown(instance);
     }

@@ -6,6 +6,8 @@
 //! Use at your own risk.
 //! Check the f*(as in friendly) code.
 
+#[cfg(feature = "cli")]
+pub mod cli;
 pub mod config;
 pub mod email;
 pub mod timer;
