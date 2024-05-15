@@ -22,8 +22,8 @@ clap = { version = "3", features = ["derive"], optional = true }
 
 [features]
 default = ["tui", "cli"]
-"cli" = ["dep:clap"]
-"tui" = ["dep:crossterm", "dep:ratatui"]
+cli = ["dep:clap"]
+tui = ["dep:crossterm", "dep:ratatui"]
 
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed
