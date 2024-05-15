@@ -8,7 +8,7 @@ license = "AGPL-3.0-only"
 readme = "README.md"
 
 [dependencies]
-clap = "=3.2.25"
+clap = { version = "3.2.25", optional = true }
 thiserror = "1"
 crossterm = { version = "0.27", optional = true }
 serde = { version = "1", features = ["derive"] }
@@ -21,7 +21,8 @@ ratatui = { version = "0.20", optional = true }
 chrono = "0.4"
 
 [features]
-default = ["tui"]
+default = ["tui", "cli"]
+"cli" = ["dep:clap"]
 "tui" = ["dep:crossterm", "dep:ratatui"]
 
 [profile.release]
