@@ -11,8 +11,7 @@ pub struct CliArgs {
 pub enum CliCommand {
     ConfigPath(PathBuf),
 }
-///This function checks for any commands passed to the program.
-///Return the arguments passed to the program if any.
+/// Parses arguments passed to the program.
 pub fn check_args() -> Option<CliArgs> {
     let args = CliArgs::parse();
     Some(args)
