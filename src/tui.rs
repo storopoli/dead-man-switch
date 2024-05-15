@@ -3,8 +3,10 @@
 #[cfg(feature = "cli")]
 use crate::cli::check_args;
 use std::io;
+use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::config::config_path;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -290,20 +292,17 @@ pub fn run() -> Result<(), TuiError> {
     // check for any cli commands
     let args = check_args();
 
-    #[cfg(not(feature = "cli"))]
-    let args = None;
-
     // Instantiate the Config
     let config_instance = Config::default();
     //loads the default config if cli is not used
     let config = match cfg!(feature = "cli") {
         true => config_instance
             .clone()
-            .load_or_initialize_config(args.unwrap().config_path)?,
+            .load_or_initialize_config(Some(PathBuf::from(args.unwrap().config)))?,
         false => config_instance.clone().load_or_initialize_config(None)?,
     };
     // Get config OS-agnostic path
-    let config_path = config_instance.config_path()?.to_string_lossy().to_string();
+    let config_path = config_path()?.to_str().unwrap().to_string();
 
     // Create a new Timer
     let mut timer = Timer::new(

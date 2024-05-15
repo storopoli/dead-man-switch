@@ -136,6 +136,8 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::config_path;
+
     use super::*;
     use std::path::PathBuf;
 
@@ -144,7 +146,7 @@ mod tests {
             username: "user@example.com".to_string(),
             password: "password".to_string(),
             smtp_server: "smtp.example.com".to_string(),
-            directory: None,
+            directory: config_path().unwrap(),
             smtp_port: 587,
             message: "This is a test message".to_string(),
             message_warning: "This is a test warning message".to_string(),
