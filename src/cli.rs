@@ -5,7 +5,7 @@ use std::path::PathBuf;
 #[clap(version, about, long_about = None)]
 pub struct CliArgs {
     #[clap(short, long)]
-    pub config_path: Option<PathBuf>,
+    pub config: PathBuf,
 }
 
 pub enum CliCommand {
