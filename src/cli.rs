@@ -15,5 +15,5 @@ pub enum CliCommand {
 ///Return the arguments passed to the program if any.
 pub fn check_args() -> Option<CliArgs> {
     let args = CliArgs::parse();
-    return Some(args);
+    Some(args)
 }

@@ -296,18 +296,14 @@ pub fn run() -> Result<(), TuiError> {
     // Instantiate the Config
     let config_instance = Config::default();
     //loads the default config if cli is not used
-    let config = config_instance.clone().load_or_initialize_config(None)?;
-    if args.is_some() {
-        let config = config_instance
+    let config = match cfg!(feature = "cli") {
+        true => config_instance
             .clone()
-            .load_or_initialize_config(args.unwrap().config_path)?;
-    }
+            .load_or_initialize_config(args.unwrap().config_path)?,
+        false => config_instance.clone().load_or_initialize_config(None)?,
+    };
     // Get config OS-agnostic path
-    let config_path = config_instance
-        .clone()
-        .config_path()?
-        .to_string_lossy()
-        .to_string();
+    let config_path = config_instance.config_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
     let mut timer = Timer::new(

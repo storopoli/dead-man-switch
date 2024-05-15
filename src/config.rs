@@ -114,19 +114,17 @@ impl Config {
 
             fs::create_dir_all(&config_dir).expect("Failed to create config directory");
             config_dir.join("config.toml")
-        } else {
-            if self.directory.is_none() {
-                let config_dir = BaseDirs::new()
-                    .expect("Failed to find home directory")
-                    .config_dir()
-                    .to_path_buf()
-                    .join("deadman");
+        } else if self.directory.is_none() {
+            let config_dir = BaseDirs::new()
+                .expect("Failed to find home directory")
+                .config_dir()
+                .to_path_buf()
+                .join("deadman");
 
-                fs::create_dir_all(&config_dir).expect("Failed to create config directory");
-                config_dir.join("config.toml")
-            } else {
-                self.directory.clone().unwrap()
-            }
+            fs::create_dir_all(&config_dir).expect("Failed to create config directory");
+            config_dir.join("config.toml")
+        } else {
+            self.directory.unwrap()
         };
         Ok(base_dir)
     }
@@ -154,11 +152,8 @@ impl Config {
     }
 
     pub fn check_path(self, provided_path: Option<PathBuf>) -> Result<PathBuf, ConfigError> {
-        if provided_path.is_none() {
-            _ = File::open(&self.clone().config_path()?);
-            Ok(self.config_path()?)
-        } else {
-            let path = provided_path.unwrap();
+        if let Some(provided_path) = provided_path {
+            let path = provided_path;
             if path.is_dir() {
                 let path = path.join("config.toml");
                 //tries to open it
@@ -169,6 +164,9 @@ impl Config {
                 _ = File::open(&path)?;
                 Ok(path)
             }
+        } else {
+            _ = File::open(self.clone().config_path()?);
+            Ok(self.config_path()?)
         }
     }
 
@@ -201,7 +199,7 @@ impl Config {
         } else {
             self.directory = Some(self.clone().check_path(provided_path)?);
             let config_path = self.config_path()?;
-            let config = fs::read_to_string(&config_path)?;
+            let config = fs::read_to_string(config_path)?;
             let config: Config = toml::from_str(&config)?;
 
             Ok(config)
