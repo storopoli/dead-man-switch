@@ -4,10 +4,13 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 
+#[cfg(not(feature = "cli"))]
 use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
+
+use crate::cli::parse_args;
 
 /// Configuration struct used for the application
 ///
@@ -105,25 +108,39 @@ pub enum Email {
 /// ## Notes
 ///
 /// This function handles testing and non-testing environments.
+#[cfg(feature = "cli")]
 pub fn config_path() -> Result<PathBuf, ConfigError> {
-    let base_dir = if cfg!(test) {
-        // Use a temporary directory for tests
-        std::env::temp_dir()
-    } else {
-        BaseDirs::new()
-            .expect("Failed to find home directory")
-            .config_dir()
-            .to_path_buf()
-    };
+    Ok(PathBuf::from(parse_args().config))
+}
 
-    let config_dir = base_dir.join(if cfg!(test) {
-        "deadman_test"
-    } else {
-        "deadman"
-    });
+/// Load the configuration from the OS-agnostic config directory.
+///
+/// Under the hood uses the [`directories_next`] crate to find the
+/// home directory and the config.
+///
+/// ## Errors
+///
+/// - Fails if the home directory cannot be found
+/// - Fails if the config directory cannot be created
+///
+/// ## Notes
+///
+/// This function handles testing and non-testing environments.
+#[cfg(not(feature = "cli"))]
+pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
+    let config_path = config_path()?;
 
-    fs::create_dir_all(&config_dir).expect("Failed to create config directory");
-    Ok(config_dir.join("config.toml"))
+    if !config_path.exists() {
+        let config = Config::default();
+        save_config(&config)?;
+
+        Ok(config)
+    } else {
+        let config = fs::read_to_string(&config_path)?;
+        let config: Config = toml::from_str(&config)?;
+
+        Ok(config)
+    }
 }
 
 /// Save the configuration to the OS-agnostic config directory.
@@ -158,19 +175,19 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
 /// ## Example
 ///
 /// ```rust
-///
-/// use dead_man_switch::config::{load_or_initialize_config, config_path};
-/// let config = load_or_initialize_config(config_path().expect("Could no retrieve default path")).unwrap();
+/// use dead_man_switch::config::load_or_initialize_config;
+/// let config = load_or_initialize_config().unwrap();
 /// ```
-pub fn load_or_initialize_config(path: PathBuf) -> Result<Config, ConfigError> {
-    if !path.exists() {
-        //maybe print something ?
+pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
+    let config_path = config_path()?;
+
+    if !config_path.exists() {
         let config = Config::default();
         save_config(&config)?;
 
         Ok(config)
     } else {
-        let config = fs::read_to_string(&path)?;
+        let config = fs::read_to_string(&config_path)?;
         let config: Config = toml::from_str(&config)?;
 
         Ok(config)
@@ -201,8 +218,7 @@ mod test {
     fn test_load_or_initialize_config() {
         let config = Config::default();
         save_config(&config).unwrap();
-        let config =
-            load_or_initialize_config(config_path().expect("Could not retrieve path")).unwrap();
+        let config = load_or_initialize_config().unwrap();
         assert_eq!(config, Config::default());
         teardown();
     }
