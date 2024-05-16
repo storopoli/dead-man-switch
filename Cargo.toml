@@ -18,10 +18,12 @@ lettre_email = "0.9"
 mime_guess = "2"
 ratatui = { version = "0.20", optional = true }
 chrono = "0.4"
+clap = { version = "3", features = ["derive"], optional = true }
 
 [features]
-default = ["tui"]
-"tui" = ["dep:crossterm", "dep:ratatui"]
+default = ["tui", "cli"]
+cli = ["dep:clap"]
+tui = ["dep:crossterm", "dep:ratatui"]
 
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed
