@@ -158,18 +158,19 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
 /// ## Example
 ///
 /// ```rust
-/// use dead_man_switch::config::load_or_initialize_config;
-/// let config = load_or_initialize_config().unwrap();
+///
+/// use dead_man_switch::config::{load_or_initialize_config, config_path};
+/// let config = load_or_initialize_config(config_path().expect("Could no retrieve default path")).unwrap();
 /// ```
-pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
-    let config_path = config_path()?;
-    if !config_path.exists() {
+pub fn load_or_initialize_config(path: PathBuf) -> Result<Config, ConfigError> {
+    if !path.exists() {
+        //maybe print something ?
         let config = Config::default();
         save_config(&config)?;
 
         Ok(config)
     } else {
-        let config = fs::read_to_string(&config_path)?;
+        let config = fs::read_to_string(&path)?;
         let config: Config = toml::from_str(&config)?;
 
         Ok(config)
@@ -200,7 +201,8 @@ mod test {
     fn test_load_or_initialize_config() {
         let config = Config::default();
         save_config(&config).unwrap();
-        let config = load_or_initialize_config().unwrap();
+        let config =
+            load_or_initialize_config(config_path().expect("Could not retrieve path")).unwrap();
         assert_eq!(config, Config::default());
         teardown();
     }

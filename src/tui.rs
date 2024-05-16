@@ -3,6 +3,8 @@
 use std::io;
 use std::time::Duration;
 
+use std::path::PathBuf;
+
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -19,6 +21,7 @@ use ratatui::{
 use thiserror::Error;
 
 use crate::{
+    cli::check_args,
     config::{config_path, load_or_initialize_config, ConfigError, Email},
     email::EmailError,
     timer::{Timer, TimerType},
@@ -277,6 +280,7 @@ pub enum TuiError {
 ///
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
+
 pub fn run() -> Result<(), TuiError> {
     // setup terminal
     enable_raw_mode()?;
@@ -286,7 +290,12 @@ pub fn run() -> Result<(), TuiError> {
     let mut terminal = Terminal::new(backend)?;
 
     // Instantiate the Config
-    let config = load_or_initialize_config()?;
+    let config = load_or_initialize_config({
+        match cfg!(feature = "cli") {
+            true => PathBuf::from(check_args().config),
+            false => config_path()?,
+        }
+    })?;
 
     // Get config OS-agnostic path
     let config_path = config_path()?.to_string_lossy().to_string();

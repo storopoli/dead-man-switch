@@ -136,7 +136,7 @@ fn format_duration(duration: ChronoDuration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::load_or_initialize_config;
+    use crate::config::{config_path, load_or_initialize_config};
     use std::thread::sleep;
 
     #[test]
@@ -225,7 +225,9 @@ mod tests {
 
     #[test]
     fn reset_warning_timer_resets_start_time() {
-        let config = load_or_initialize_config().unwrap();
+        let config =
+            load_or_initialize_config(config_path().expect("Could not retrieve Default path"))
+                .unwrap();
 
         let mut timer = Timer::new(
             TimerType::Warning,
@@ -242,7 +244,9 @@ mod tests {
 
     #[test]
     fn reset_dead_man_timer_promotes_to_warning_and_resets() {
-        let config = load_or_initialize_config().unwrap();
+        let config =
+            load_or_initialize_config(config_path().expect("Could not retrieve Default path"))
+                .unwrap();
 
         let mut timer = Timer::new(
             TimerType::DeadMan,
