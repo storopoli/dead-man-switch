@@ -14,3 +14,24 @@ pub struct DmsArgs {
 pub fn check_args() -> DmsArgs {
     DmsArgs::parse()
 }
+
+#[cfg(test)]
+mod test {
+    use crate::config::load_or_initialize_config;
+    use std::path::PathBuf;
+
+    use super::*;
+    use clap::CommandFactory;
+    #[test]
+    fn test_clap() {
+        DmsArgs::command().debug_assert()
+    }
+    #[test]
+    fn test_provided_config() {
+        let args = DmsArgs {
+            config: "./config.example.toml".to_string(),
+        };
+        let config = load_or_initialize_config(PathBuf::from(args.config)).unwrap();
+        assert_eq!(config.timer_dead_man, 604800);
+    }
+}
