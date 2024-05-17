@@ -4,6 +4,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 
+use directories_next::BaseDirs;
 #[cfg(not(feature = "cli"))]
 use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
@@ -95,52 +96,40 @@ pub enum Email {
     DeadMan,
 }
 
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
+/// Load the configuration from the user-supplied config file or create a new one
+/// if none is provided.
 ///
 /// ## Errors
 ///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
+/// - Fails if the config file cannot be found
+/// - Fails if the config file cannot be created
 ///
 /// ## Notes
 ///
-/// This function handles testing and non-testing environments.
-#[cfg(feature = "cli")]
+/// Handles both testing and non-testing environments.
 pub fn config_path() -> Result<PathBuf, ConfigError> {
-    Ok(PathBuf::from(parse_args().config))
-}
-
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
-///
-/// ## Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
-///
-/// ## Notes
-///
-/// This function handles testing and non-testing environments.
-#[cfg(not(feature = "cli"))]
-pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
-    let config_path = config_path()?;
-
-    if !config_path.exists() {
-        let config = Config::default();
-        save_config(&config)?;
-
-        Ok(config)
-    } else {
-        let config = fs::read_to_string(&config_path)?;
-        let config: Config = toml::from_str(&config)?;
-
-        Ok(config)
+    match cfg!(feature = "cli") {
+        true => Ok(PathBuf::from(parse_args().config)),
+        false => Ok(default_path()),
     }
+}
+pub fn default_path() -> PathBuf {
+    let base_dir = match cfg!(test) {
+        // Use a temporary directory for tests
+        true => std::env::temp_dir(),
+        false => BaseDirs::new()
+            .expect("Failed to find home directory")
+            .config_dir()
+            .to_path_buf(),
+    };
+    let config_dir = base_dir.join(if cfg!(test) {
+        "deadman_test"
+    } else {
+        "deadman"
+    });
+
+    fs::create_dir_all(&config_dir).expect("Failed to create config directory");
+    config_dir.join("config.toml")
 }
 
 /// Save the configuration to the OS-agnostic config directory.
