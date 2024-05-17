@@ -3,9 +3,6 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
-
-use directories_next::BaseDirs;
-#[cfg(not(feature = "cli"))]
 use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
