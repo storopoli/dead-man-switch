@@ -1,13 +1,14 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
+use directories_next::BaseDirs;
+use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
-
-use directories_next::BaseDirs;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
+
+use crate::cli::parse_args;
 
 /// Configuration struct used for the application
 ///
@@ -92,30 +93,32 @@ pub enum Email {
     DeadMan,
 }
 
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
+/// Load the configuration from the user-supplied config file or create a new one
+/// if none is provided.
 ///
 /// ## Errors
 ///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
+/// - Fails if the config file cannot be found
+/// - Fails if the config file cannot be created
 ///
 /// ## Notes
 ///
-/// This function handles testing and non-testing environments.
+/// Handles both testing and non-testing environments.
 pub fn config_path() -> Result<PathBuf, ConfigError> {
-    let base_dir = if cfg!(test) {
+    match cfg!(feature = "cli") {
+        true => Ok(PathBuf::from(parse_args().config)),
+        false => Ok(default_path()),
+    }
+}
+pub fn default_path() -> PathBuf {
+    let base_dir = match cfg!(test) {
         // Use a temporary directory for tests
-        std::env::temp_dir()
-    } else {
-        BaseDirs::new()
+        true => std::env::temp_dir(),
+        false => BaseDirs::new()
             .expect("Failed to find home directory")
             .config_dir()
-            .to_path_buf()
+            .to_path_buf(),
     };
-
     let config_dir = base_dir.join(if cfg!(test) {
         "deadman_test"
     } else {
@@ -123,7 +126,7 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
     });
 
     fs::create_dir_all(&config_dir).expect("Failed to create config directory");
-    Ok(config_dir.join("config.toml"))
+    config_dir.join("config.toml")
 }
 
 /// Save the configuration to the OS-agnostic config directory.
@@ -163,6 +166,7 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
 /// ```
 pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
     let config_path = config_path()?;
+
     if !config_path.exists() {
         let config = Config::default();
         save_config(&config)?;
