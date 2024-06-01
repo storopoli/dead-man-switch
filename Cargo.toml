@@ -16,7 +16,7 @@ directories-next = "2"
 lettre = { version = "0.10", features = ["rustls-tls", "builder"] }
 lettre_email = "0.9"
 mime_guess = "2"
-ratatui = { version = "0.20", optional = true }
+ratatui = { version = "0.26", optional = true }
 chrono = "0.4"
 
 [features]
