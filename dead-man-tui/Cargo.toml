@@ -1,0 +1,15 @@
+[package]
+name = "dead-man-tui"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jose Storopoli <jose@storopoli.io>"]
+description = "Dead Man's Switch TUI Library"
+license = "AGPL-3.0-only"
+
+[dependencies]
+dead-man-config = { path = "../dead-man-config", version = "0.1" }
+dead-man-timers = { path = "../dead-man-timers", version = "0.1" }
+dead-man-email = { path = "../dead-man-email", version = "0.1" }
+thiserror = "1"
+crossterm = "0.27"
+ratatui = "0.20"

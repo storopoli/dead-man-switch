@@ -8,14 +8,12 @@
 
 use std::error::Error;
 
-#[cfg(feature = "tui")]
-use dead_man_switch::run;
+use dead_man_tui::run;
 
 /// The main function.
 ///
 /// This function executes the main loop of the application
 /// by calling the [`run`] function.
-#[cfg(feature = "tui")]
 fn main() -> Result<(), Box<dyn Error>> {
     run()?;
     Ok(())
