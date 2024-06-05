@@ -12,10 +12,9 @@
 use std::time::{Duration, Instant};
 
 use chrono::Duration as ChronoDuration;
+use dead_man_config::Config;
 
 /// The timer enum.
-///
-/// See [`timer`](crate::timer) module for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerType {
     /// The warning timer.
@@ -27,7 +26,6 @@ pub enum TimerType {
 /// The timer struct.
 ///
 /// Holds the [`TimerType`], current the duration, and the expiration time.
-/// See [`timer`](crate::timer) module for more information.
 pub struct Timer {
     /// The timer type.
     timer_type: TimerType,
@@ -94,7 +92,7 @@ impl Timer {
     /// to [`TimerType::Warning`], if applicable.
     ///
     /// This is called when the user checks in.
-    pub fn reset(&mut self, config: &crate::config::Config) {
+    pub fn reset(&mut self, config: &Config) {
         match self.get_type() {
             TimerType::Warning => {
                 self.start = Instant::now();
@@ -136,8 +134,16 @@ fn format_duration(duration: ChronoDuration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::load_or_initialize_config;
+
+    use std::fs;
     use std::thread::sleep;
+
+    use dead_man_config::{config_path, load_or_initialize_config};
+
+    fn teardown() {
+        // Cleanup test config file after each test to prevent state leakage
+        let _ = fs::remove_file(config_path().unwrap());
+    }
 
     #[test]
     fn timer_creation() {
@@ -235,9 +241,11 @@ mod tests {
         // Simulate time passing
         sleep(Duration::from_millis(100));
         timer.reset(&config);
+        sleep(Duration::from_millis(100));
         assert!(timer.start > original_start);
         assert_eq!(timer.duration, Duration::from_secs(config.timer_warning));
         assert_eq!(timer.get_type(), TimerType::Warning);
+        teardown();
     }
 
     #[test]
@@ -251,7 +259,9 @@ mod tests {
         // Simulate time passing
         sleep(Duration::from_millis(100));
         timer.reset(&config);
+        sleep(Duration::from_millis(100));
         assert_eq!(timer.get_type(), TimerType::Warning);
         assert_eq!(timer.duration, Duration::from_secs(config.timer_warning));
+        teardown();
     }
 }

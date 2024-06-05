@@ -21,7 +21,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: rustfmt
         run: cargo fmt --all --check
 
@@ -35,7 +35,7 @@ jobs:
       - name: cargo doc
         env:
           RUSTDOCFLAGS: "-D rustdoc::all -A rustdoc::private-doc-tests"
-        run: cargo doc --all-features --no-deps
+        run: cargo doc --workspace --all-features --no-deps
 
   test-versions:
     needs: check
@@ -54,4 +54,4 @@ jobs:
         run: |
           # Cleanup any previous deadman configuration
           rm -rf $XDG_CONFIG_HOME/deadman
-          cargo test --all-features --all-targets
+          cargo test --workspace --all-features --all-targets

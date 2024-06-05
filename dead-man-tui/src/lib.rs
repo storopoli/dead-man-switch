@@ -18,11 +18,9 @@ use ratatui::{
 };
 use thiserror::Error;
 
-use crate::{
-    config::{config_path, load_or_initialize_config, ConfigError, Email},
-    email::EmailError,
-    timer::{Timer, TimerType},
-};
+use dead_man_config::{config_path, load_or_initialize_config, ConfigError};
+use dead_man_email::{send_email, Email, EmailError};
+use dead_man_timers::{Timer, TimerType};
 
 /// The ASCII art for the TUI's main block.
 const ASCII_ART: [&str; 5] = [
@@ -37,7 +35,7 @@ const ASCII_ART: [&str; 5] = [
 ///
 /// This function will render the UI.
 /// It's a simple UI with 3 blocks.
-fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
+fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer_tui: &TimerTui) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -61,11 +59,11 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
     let instructions_widget = instructions_block(config_path);
     f.render_widget(instructions_widget, chunks[2]);
 
-    let gauge_title = timer.title();
-    let gauge_style = timer.gauge_style();
-    let label_style = timer.label_style();
-    let label = timer.label();
-    let current_percent = timer.remaining_percent();
+    let gauge_title = timer_tui.title();
+    let gauge_style = timer_tui.gauge_style();
+    let label_style = timer_tui.label_style();
+    let label = timer_tui.timer.label();
+    let current_percent = timer_tui.timer.remaining_percent();
     let timer_widget = timer_block(
         gauge_title,
         current_percent,
@@ -225,10 +223,15 @@ fn timer_block(
         .block(Block::default().title(title).borders(Borders::ALL))
 }
 
-impl Timer {
+/// Blanket implementation for the [`Timer`] struct.
+struct TimerTui {
+    timer: Timer,
+}
+
+impl TimerTui {
     /// Determine the gauge style based on the timer state
     fn gauge_style(&self) -> Style {
-        let percent = self.remaining_percent();
+        let percent = self.timer.remaining_percent();
         let style = if percent > 30 {
             Style::default().fg(Color::Green)
         } else {
@@ -239,7 +242,7 @@ impl Timer {
 
     // Determine the label style based on the timer state
     fn label_style(&self) -> Style {
-        let percent = self.remaining_percent();
+        let percent = self.timer.remaining_percent();
 
         let style = if percent > 30 {
             Style::default().fg(Color::DarkGray)
@@ -251,7 +254,7 @@ impl Timer {
 
     // Determine the Widget title based on the type of Timer
     fn title(&self) -> String {
-        match self.get_type() {
+        match self.timer.get_type() {
             TimerType::Warning => "Warning".to_string(),
             TimerType::DeadMan => "Dead Man's Switch".to_string(),
         }
@@ -292,36 +295,38 @@ pub fn run() -> Result<(), TuiError> {
     let config_path = config_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
-    let mut timer = Timer::new(
+    let timer = Timer::new(
         TimerType::Warning,
         Duration::from_secs(config.timer_warning),
     );
 
+    let mut timer_tui = TimerTui { timer };
+
     // Main loop
     loop {
-        let elapsed = timer.elapsed();
-        timer.update(elapsed, config.timer_dead_man);
-        terminal.draw(|f| ui(f, &config_path, &timer))?;
+        let elapsed = timer_tui.timer.elapsed();
+        timer_tui.timer.update(elapsed, config.timer_dead_man);
+        terminal.draw(|f| ui(f, &config_path, &timer_tui))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break, // Quit
-                    KeyCode::Char('c') => timer.reset(&config), // Check-In
+                    KeyCode::Char('c') => timer_tui.timer.reset(&config), // Check-In
                     _ => {}
                 }
             }
         }
 
         // Condition to exit the loop
-        if timer.expired() {
-            match timer.get_type() {
+        if timer_tui.timer.expired() {
+            match timer_tui.timer.get_type() {
                 TimerType::Warning => {
-                    config.send_email(Email::Warning)?;
+                    send_email(&config, Email::Warning)?;
                 }
                 TimerType::DeadMan => {
-                    config.send_email(Email::DeadMan)?;
+                    send_email(&config, Email::DeadMan)?;
                     break;
                 }
             }

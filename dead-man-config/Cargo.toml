@@ -1,0 +1,13 @@
+[package]
+name = "dead-man-config"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jose Storopoli <jose@storopoli.io>"]
+description = "Dead Man's Switch Config Library"
+license = "AGPL-3.0-only"
+
+[dependencies]
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.5"
+directories-next = "2"
