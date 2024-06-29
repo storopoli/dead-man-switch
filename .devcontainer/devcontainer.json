@@ -1,8 +1,9 @@
 {
   "name": "Rust",
+
   "image": "mcr.microsoft.com/devcontainers/base:debian",
+
   "features": {
-    // Custom Rust Version
     "ghcr.io/devcontainers/features/rust:1": {
       "version": "1.63.0" // Rust MSRV for the project
     },
@@ -11,6 +12,19 @@
       "packages": "pkg-config,libssl-dev"
     }
   },
+  
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh",
+      "target": "/home/vscode/.config/gh",
+      "type": "bind"
+    },
+    {
+      "source": "devcontainer-cargo-cache",
+      "target": "/usr/local/cargo",
+      "type": "volume"
+    }
+  ],
 
   "customizations": {
     "vscode": {
@@ -22,9 +36,6 @@
       ]
     }
   },
-
-  // If you need to access the PostgreSQL database from the host machine
-  // "forwardPorts": [],
 
   // Rootless Docker user
   "remoteUser": "vscode"
