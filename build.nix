@@ -2,7 +2,7 @@
 
 let
   pname = "dead-man-switch";
-  version = "0.3.0";
+  version = "0.3.1";
 
   buildRustPackage = rustPlatform.buildRustPackage.override {
     rustc = rust;
