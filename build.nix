@@ -2,7 +2,7 @@
 
 let
   pname = "dead-man-switch";
-  version = "0.1.0";
+  version = "0.3.0";
 
   buildRustPackage = rustPlatform.buildRustPackage.override {
     rustc = rust;
@@ -30,7 +30,7 @@ buildRustPackage {
   meta = with lib; {
     description = "Rust no-BS Dead Man's Switch";
     homepage = "https://github.com/storopoli/dead-man-switch";
-    license = licenses.agpl3;
+    license = licenses.agpl3Only;
     maintainers = [ maintainers.storopoli ];
     platforms = platforms.all;
   };
