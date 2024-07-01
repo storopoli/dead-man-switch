@@ -1,4 +1,4 @@
-//! Configuration crate for the Dead Man's Switch
+//! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
 use std::fs::{self, File};
 use std::io::Write;
@@ -83,6 +83,15 @@ pub enum ConfigError {
     TomlDerError(#[from] DerTomlError),
 }
 
+/// Enum to represent the type of email to send.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Email {
+    /// Send the warning email.
+    Warning,
+    /// Send the dead man's email.
+    DeadMan,
+}
+
 /// Load the configuration from the OS-agnostic config directory.
 ///
 /// Under the hood uses the [`directories_next`] crate to find the
@@ -149,7 +158,7 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
 /// ## Example
 ///
 /// ```rust
-/// use dead_man_config::load_or_initialize_config;
+/// use dead_man_switch::config::load_or_initialize_config;
 /// let config = load_or_initialize_config().unwrap();
 /// ```
 pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
