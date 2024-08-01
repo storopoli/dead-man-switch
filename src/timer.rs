@@ -7,7 +7,7 @@
 //! 1. The [`TimerType::Warning`] timer that emits a warning to the user's
 //!    configured `From` email address upon expiration.
 //! 1. The [`TimerType::DeadMan`] timer that will trigger the message and optional
-//!   attachment to the user's configured `To` email address upon expiration.
+//!    attachment to the user's configured `To` email address upon expiration.
 
 use std::time::{Duration, Instant};
 
