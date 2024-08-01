@@ -9,7 +9,7 @@ readme = "README.md"
 
 [dependencies]
 thiserror = "1"
-crossterm = { version = "0.27", optional = true }
+crossterm = { version = "0.28", optional = true }
 serde = { version = "1", features = ["derive"] }
 toml = "0.5"
 directories-next = "2"
