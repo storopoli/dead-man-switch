@@ -9,16 +9,16 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
 use thiserror::Error;
 
-use crate::{
+use dead_man_switch::{
     config::{config_path, load_or_initialize_config, ConfigError, Email},
     email::EmailError,
     timer::{Timer, TimerType},
@@ -33,11 +33,52 @@ const ASCII_ART: [&str; 5] = [
     "██████  ███████ ██   ██ ██████      ██      ██ ██   ██ ██   ████ ███████     ███████  ███ ███  ██    ██     ██████ ██   ██",
 ];
 
+/// Wrapper around [`Timer`].
+struct TuiTimer(Timer);
+
+impl TuiTimer {
+    /// Determines the gauge style based on the inner [`Timer`] state.
+    fn gauge_style(&self) -> Style {
+        let percent = self.0.remaining_percent();
+        let style = if percent > 30 {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+        Style::default().fg(style.fg.unwrap())
+    }
+
+    /// Determines the label style based on the inner [`Timer`] state.
+    fn label_style(&self) -> Style {
+        let percent = self.0.remaining_percent();
+
+        let style = if percent > 30 {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        };
+        Style::default().fg(style.fg.unwrap())
+    }
+
+    /// Determines the Widget title based on the inner [`Timer`] type.
+    fn title(&self) -> String {
+        match self.0.get_type() {
+            TimerType::Warning => "Warning".to_string(),
+            TimerType::DeadMan => "Dead Man's Switch".to_string(),
+        }
+    }
+
+    /// Creates a new [`TuiTimer`] from a [`Timer`].
+    fn new(timer: Timer) -> Self {
+        TuiTimer(timer)
+    }
+}
+
 /// The main UI function.
 ///
 /// This function will render the UI.
 /// It's a simple UI with 3 blocks.
-fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
+fn ui(f: &mut Frame, config_path: &str, timer: &TuiTimer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -50,7 +91,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let legend_widget = legend_block();
     f.render_widget(legend_widget, chunks[0]);
@@ -64,8 +105,8 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
     let gauge_title = timer.title();
     let gauge_style = timer.gauge_style();
     let label_style = timer.label_style();
-    let label = timer.label();
-    let current_percent = timer.remaining_percent();
+    let label = timer.0.label();
+    let current_percent = timer.0.remaining_percent();
     let timer_widget = timer_block(
         gauge_title,
         current_percent,
@@ -80,7 +121,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, config_path: &str, timer: &Timer) {
 ///
 /// Contains the keys legend for the TUI.
 fn legend_block() -> Paragraph<'static> {
-    let text = vec![Spans::from(vec![
+    let text = vec![Line::from(vec![
         Span::styled(
             "c",
             Style::default()
@@ -109,7 +150,7 @@ fn legend_block() -> Paragraph<'static> {
 /// Contains the instructions for the TUI.
 fn instructions_block(config_path: &str) -> Paragraph<'static> {
     let text = vec![
-        Spans::from(vec![
+        Line::from(vec![
             Span::styled(
                 "1. ",
                 Style::default()
@@ -125,7 +166,7 @@ fn instructions_block(config_path: &str) -> Paragraph<'static> {
             ),
             Span::raw(" and modify the settings."),
         ]),
-        Spans::from(vec![
+        Line::from(vec![
             Span::styled(
                 "2. ",
                 Style::default()
@@ -145,7 +186,7 @@ fn instructions_block(config_path: &str) -> Paragraph<'static> {
                 " within the warning time.",
             ),
         ]),
-        Spans::from(vec![
+        Line::from(vec![
             Span::styled(
                 "3. ",
                 Style::default()
@@ -168,10 +209,10 @@ fn instructions_block(config_path: &str) -> Paragraph<'static> {
 ///
 /// Contains the ASCII art for the TUI.
 fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
-    let text: Vec<Spans<'_>> = content
+    let text: Vec<Line<'_>> = content
         .iter()
         .map(|line| {
-            Spans::from(Span::styled(
+            Line::from(Span::styled(
                 *line,
                 Style::default()
                     .fg(Color::Green)
@@ -225,59 +266,25 @@ fn timer_block(
         .block(Block::default().title(title).borders(Borders::ALL))
 }
 
-impl Timer {
-    /// Determine the gauge style based on the timer state
-    fn gauge_style(&self) -> Style {
-        let percent = self.remaining_percent();
-        let style = if percent > 30 {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default().fg(Color::Red)
-        };
-        Style::default().fg(style.fg.unwrap())
-    }
-
-    // Determine the label style based on the timer state
-    fn label_style(&self) -> Style {
-        let percent = self.remaining_percent();
-
-        let style = if percent > 30 {
-            Style::default().fg(Color::DarkGray)
-        } else {
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
-        };
-        Style::default().fg(style.fg.unwrap())
-    }
-
-    // Determine the Widget title based on the type of Timer
-    fn title(&self) -> String {
-        match self.get_type() {
-            TimerType::Warning => "Warning".to_string(),
-            TimerType::DeadMan => "Dead Man's Switch".to_string(),
-        }
-    }
-}
-
 /// TUI Error type.
 #[derive(Error, Debug)]
-
-pub enum TuiError {
+enum TuiError {
     /// IO Error.
     #[error(transparent)]
-    IoError(#[from] io::Error),
+    Io(#[from] io::Error),
     /// [`ConfigError`] blanket error conversion.
     #[error(transparent)]
-    ConfigError(#[from] ConfigError),
+    Config(#[from] ConfigError),
     /// [`EmailError`] blanket error conversion.
     #[error(transparent)]
-    EmailError(#[from] EmailError),
+    Email(#[from] EmailError),
 }
 
 /// Run the TUI.
 ///
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
-pub fn run() -> Result<(), TuiError> {
+fn run() -> Result<(), TuiError> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -292,31 +299,31 @@ pub fn run() -> Result<(), TuiError> {
     let config_path = config_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
-    let mut timer = Timer::new(
+    let mut timer = TuiTimer::new(Timer::new(
         TimerType::Warning,
         Duration::from_secs(config.timer_warning),
-    );
+    ));
 
     // Main loop
     loop {
-        let elapsed = timer.elapsed();
-        timer.update(elapsed, config.timer_dead_man);
+        let elapsed = timer.0.elapsed();
+        timer.0.update(elapsed, config.timer_dead_man);
         terminal.draw(|f| ui(f, &config_path, &timer))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break, // Quit
-                    KeyCode::Char('c') => timer.reset(&config), // Check-In
+                    KeyCode::Char('q') | KeyCode::Esc => break,   // Quit
+                    KeyCode::Char('c') => timer.0.reset(&config), // Check-In
                     _ => {}
                 }
             }
         }
 
         // Condition to exit the loop
-        if timer.expired() {
-            match timer.get_type() {
+        if timer.0.expired() {
+            match timer.0.get_type() {
                 TimerType::Warning => {
                     config.send_email(Email::Warning)?;
                 }
@@ -337,5 +344,14 @@ pub fn run() -> Result<(), TuiError> {
     )?;
     terminal.show_cursor()?;
 
+    Ok(())
+}
+
+/// The main function.
+///
+/// This function executes the main loop of the application
+/// by calling the [`run`] function.
+fn main() -> Result<(), TuiError> {
+    run()?;
     Ok(())
 }

@@ -1,27 +1,19 @@
-[package]
+[workspace]
+resolver = "2"
+members = [
+    "crates/dead-man-switch",
+    "crates/dead-man-switch-tui",
+]
+default-members = ["crates/dead-man-switch", "crates/dead-man-switch-tui"]
+
+[workspace.package]
 name = "dead-man-switch"
-version = "0.3.2"
 edition = "2021"
+version = "0.4.0"
 authors = ["Jose Storopoli <jose@storopoli.io>"]
 description = "A simple no-BS Dead Man's Switch"
 license = "AGPL-3.0-only"
 readme = "README.md"
-
-[dependencies]
-thiserror = "1"
-crossterm = { version = "0.27", optional = true }
-serde = { version = "1", features = ["derive"] }
-toml = "0.5"
-directories-next = "2"
-lettre = { version = "0.10", features = ["rustls-tls", "builder"] }
-lettre_email = "0.9"
-mime_guess = "2"
-ratatui = { version = "0.20", optional = true }
-chrono = "0.4"
-
-[features]
-default = ["tui"]
-"tui" = ["dep:crossterm", "dep:ratatui"]
 
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed

@@ -1,5 +1,6 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
+use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
@@ -47,10 +48,17 @@ pub struct Config {
     pub timer_warning: u64,
     /// Timer in seconds for the dead man's email.
     pub timer_dead_man: u64,
+    /// Web interface password
+    #[cfg(feature = "web")]
+    pub web_password: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
+        #[cfg(feature = "web")]
+        let web_password = env::var("WEB_PASSWORD")
+            .ok()
+            .unwrap_or("password".to_string());
         Self {
             username: "me@example.com".to_string(),
             password: "".to_string(),
@@ -65,6 +73,8 @@ impl Default for Config {
             attachment: None,
             timer_warning: 60 * 60 * 24 * 14, // 2 weeks
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
+            #[cfg(feature = "web")]
+            web_password,
         }
     }
 }
@@ -74,13 +84,13 @@ impl Default for Config {
 pub enum ConfigError {
     /// IO operations on config module
     #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     /// TOML serialization
     #[error(transparent)]
-    TomlSerError(#[from] SerTomlError),
+    TomlSerialization(#[from] SerTomlError),
     /// TOML deserialization
     #[error(transparent)]
-    TomlDerError(#[from] DerTomlError),
+    TomlDeserialization(#[from] DerTomlError),
 }
 
 /// Enum to represent the type of email to send.
