@@ -306,8 +306,6 @@ fn run() -> Result<(), TuiError> {
 
     // Main loop
     loop {
-        let elapsed = timer.0.elapsed();
-        timer.0.update(elapsed, config.timer_dead_man);
         terminal.draw(|f| ui(f, &config_path, &timer))?;
 
         // Poll for events
@@ -333,6 +331,9 @@ fn run() -> Result<(), TuiError> {
                 }
             }
         }
+
+        let elapsed = timer.0.elapsed();
+        timer.0.update(elapsed, config.timer_dead_man);
     }
 
     // Restore terminal
