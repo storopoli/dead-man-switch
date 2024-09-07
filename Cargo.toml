@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/dead-man-switch",
     "crates/dead-man-switch-tui",
+    "crates/dead-man-switch-web",
 ]
 default-members = ["crates/dead-man-switch", "crates/dead-man-switch-tui"]
 

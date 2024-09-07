@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Login</title>
+    </head>
+    <body>
+        <h1>Login</h1>
+        <form action="/" method="post">
+            <label for="password">Password:</label>
+            <input type="password" name="password" required>
+            <button type="submit">Login</button>
+        </form>
+        {% if error %}
+        <p style="color: red;">Invalid Password!</p>
+        {% endif %}
+    </body>
+</html>

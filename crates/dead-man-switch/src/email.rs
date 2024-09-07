@@ -154,6 +154,8 @@ mod tests {
             attachment: None,
             timer_warning: 60,
             timer_dead_man: 120,
+            #[cfg(feature = "web")]
+            web_password: "password".to_string(),
         }
     }
 

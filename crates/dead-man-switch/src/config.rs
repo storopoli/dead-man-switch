@@ -1,6 +1,8 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
+#[cfg(feature = "web")]
 use std::env;
+
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;

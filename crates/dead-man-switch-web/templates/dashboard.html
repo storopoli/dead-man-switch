@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Dashboard</title>
+    </head>
+    <body>
+        <h1>Dashboard</h1>
+        <p>Time left before warning: {{ time_left_warning }}</p>
+        <p>Time left before Dead Man's Switch triggers: {{ time_left_dead_man }}</p>
+        <form action="/dashboard" method="post">
+            <button type="submit">Check-In</button>
+        </form>
+    </body>
+</html>
