@@ -116,15 +116,6 @@ dead-man-switch = { version = "0.2", default-features = false }
 Make sure that you're disabling the default features to avoid
 any extra bloat from `ratatui` and `crossterm` dependencies.
 
-## Minimum Supported Rust Version
-
-This crate uses current Debian stable Rust version as Minimum Supported Rust
-Version (MSRV).
-Please check [Debian's `rustc` package](https://packages.debian.org/search?keywords=rustc)
-for more details.
-
-Currently, the MSRV is `1.63.0`.
-
 ## License
 
 The source code is licensed under an
