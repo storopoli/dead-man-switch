@@ -28,6 +28,7 @@ pub enum TimerType {
 ///
 /// Holds the [`TimerType`], current the duration, and the expiration time.
 /// See [`timer`](crate::timer) module for more information.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Timer {
     /// The timer type.
     timer_type: TimerType,
