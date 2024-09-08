@@ -1,10 +1,10 @@
 [package]
 name = "dead-man-switch"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-description.workspace = true
-license.workspace = true
+edition = "2021"
+version = "0.4.0"
+authors = ["Jose Storopoli <jose@storopoli.io>"]
+description = "A simple no-BS Dead Man's Switch"
+license = "AGPL-3.0-only"
 readme = "../../README.md"
 
 [dependencies]
