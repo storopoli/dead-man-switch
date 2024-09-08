@@ -99,7 +99,6 @@ There are several ways to install Dead Man's Switch:
 
    Then `dead-man-switch` will be available as `pkgs.dead-man-switch`;
 
-
 ## Using as a Library
 
 Dead Man's Switch can be used as a library.
@@ -113,8 +112,34 @@ To do so you can add the following to your `Cargo.toml`:
 dead-man-switch = "0.4"
 ```
 
-Make sure that you're disabling the default features to avoid
-any extra bloat from `ratatui` and `crossterm` dependencies.
+## Web Interface
+
+The Dead Man's Switch is also available as a web interface.
+
+![web interface](https://github.com/storopoli/dead-man-switch/raw/main/web-interface.png)
+
+To use the web interface, please follow the instructions below:
+
+1. Change the configuration template file with your own values:
+
+   ```bash
+   cp config.example.toml config.toml
+   ```
+
+1. Copy the Docker Compose example file:
+
+   ```bash
+   cp docker-compose.example.yml docker-compose.yml
+   ```
+
+1. Run the Docker Compose:
+
+   ```bash
+   docker-compose up --detach
+   ```
+
+1. Make sure to [reverse proxy](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)
+   the web interface with proper security measures such as HTTPS.
 
 ## License
 
