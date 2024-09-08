@@ -5,11 +5,12 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use anyhow::Context;
 use askama::Template;
 use axum::{
+    error_handling::HandleErrorLayer,
     extract::{Form, FromRef, State},
     http::{Method, StatusCode},
     response::{Html, IntoResponse, Redirect},
     routing::get,
-    serve, Router,
+    serve, BoxError, Router,
 };
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar};
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -206,6 +207,11 @@ async fn main() -> anyhow::Result<()> {
         key: Key::generate(),
         hashed_password,
     };
+
+    // CORS Layer
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(Any);
 
     // Routes
     let app = Router::new()
