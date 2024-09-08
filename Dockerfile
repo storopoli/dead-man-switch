@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib
 WORKDIR /usr/src/app
 
 # Copy the binary from the builder stage to the new stage
-COPY --from=builder /usr/src/app/target//release/dead-man-switch-web /usr/local/bin/dead-man-switch-web
+COPY --from=builder /usr/src/app/target/release/dead-man-switch-web /usr/local/bin/dead-man-switch-web
 
 # Expose port 3000
 EXPOSE 3000
