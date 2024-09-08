@@ -185,13 +185,13 @@ async fn show_dashboard(
 async fn handle_check_in(
     jar: PrivateCookieJar,
     State(state): State<SharedState>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, impl IntoResponse> {
     if let Some(cookie) = jar.get("auth") {
         if cookie.value() == "true" {
-            let config = state.app_state.config.blocking_read();
+            let config = state.app_state.config.read().await;
             let mut timer = state.app_state.timer.lock().await;
             timer.reset(&config);
-            return (StatusCode::OK, Redirect::to("/dashboard"));
+            return Ok(Redirect::to("/dashboard"));
         }
     }
     warn!("Unauthorized access to check-in");
