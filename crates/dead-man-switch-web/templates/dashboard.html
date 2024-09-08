@@ -2,17 +2,34 @@
 <html>
     <head>
         <title>Dashboard</title>
+        <script>
+            // Function to fetch timer data every second and update the DOM
+            function updateDashboard() {
+                fetch('/timer')  // Fetch data from the server
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update the timer details in the page
+                        document.getElementById('timer_type').innerText = data.timer_type;
+                        document.getElementById('label').innerText = data.label;
+                        document.getElementById('time_left_percentage').innerText = data.time_left_percentage;
+                    })
+                    .catch(error => console.error('Error fetching timer data:', error));
+            }
+
+            // Set interval to update the dashboard every second
+            setInterval(updateDashboard, 1000);
+        </script>
     </head>
-    <body>
+    <body onload="updateDashboard()">
         <h1>Dashboard</h1>
-        <p>Time type: {{ timer_type }}</p>
-        <p>Time left: {{ label }}</p>
-        <p>Percentage: {{ time_left_percentage }}</p>
-         <!-- Checkin button -->
+        <p>Timer: <span id="timer_type">{{ timer_type }}</span></p>
+        <p>Time left: <span id="label">{{ label }}</span></p>
+        <p>Percentage: <span id="time_left_percentage">{{ time_left_percentage }}</span></p>
+        <!-- Check-in button -->
         <form action="/dashboard" method="post">
             <button type="submit">Check-In</button>
         </form>
-         <!-- Logout button -->
+        <!-- Logout button -->
         <form action="/logout" method="post">
             <button type="submit">Logout</button>
         </form>

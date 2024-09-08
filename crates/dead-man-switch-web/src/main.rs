@@ -10,7 +10,7 @@ use axum::{
     http::{Method, StatusCode},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
-    serve, BoxError, Router,
+    serve, BoxError, Json, Router,
 };
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar};
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -18,6 +18,7 @@ use dead_man_switch::{
     config::{load_or_initialize_config, Config, Email},
     timer::{Timer, TimerType},
 };
+use serde::Serialize;
 use tokio::sync::{Mutex, RwLock};
 use tokio::{net::TcpListener, time::sleep};
 use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
@@ -51,6 +52,14 @@ impl FromRef<SharedState> for Key {
     fn from_ref(state: &SharedState) -> Self {
         state.key.clone()
     }
+}
+
+/// Timer data to be sent as a JSON response.
+#[derive(Serialize)]
+struct TimerData {
+    timer_type: String,
+    time_left_percentage: u16,
+    label: String,
 }
 
 #[derive(Template)]
@@ -195,7 +204,32 @@ async fn handle_check_in(
         }
     }
     warn!("Unauthorized access to check-in");
-    (StatusCode::UNAUTHORIZED, Redirect::to("/"))
+    Err(StatusCode::UNAUTHORIZED)
+}
+
+/// Endpoint to serve the current timer data in JSON
+async fn timer_data(
+    jar: PrivateCookieJar,
+    State(state): State<SharedState>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    if let Some(cookie) = jar.get("auth") {
+        if cookie.value() == "true" {
+            let timer = state.app_state.timer.lock().await;
+            let timer_type = format!("{:?}", timer.get_type());
+            let time_left_percentage = timer.remaining_percent();
+            let label = timer.label();
+
+            let data = TimerData {
+                timer_type,
+                label,
+                time_left_percentage,
+            };
+
+            return Ok(Json(data));
+        }
+    }
+    warn!("Unauthorized access to timer data");
+    Err(StatusCode::UNAUTHORIZED)
 }
 
 #[tokio::main]
@@ -241,6 +275,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(show_login).post(handle_login))
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
+        .route("/timer", get(timer_data))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {

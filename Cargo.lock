@@ -553,6 +553,7 @@ dependencies = [
  "axum-extra",
  "bcrypt",
  "dead-man-switch",
+ "serde",
  "tokio",
  "tower 0.5.0",
  "tower-http",
