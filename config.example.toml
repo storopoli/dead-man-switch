@@ -1,4 +1,5 @@
-# Upon starting the program it will create this config.toml file.
+# Template config file for the Dead Man's Switch.
+# Please copy this file to config.toml and fill in the necessary information.
 # Read the README.md for more information on the file location.
 username = "me@example.com"
 password = ""
