@@ -32,8 +32,8 @@ the switch automatically sends the desired message.
 > If you want a very simple explanation and the motivation behind the project,
 > check my blog post [here](https://storopoli.io/2024-03-23-dead-man-switch/).
 
-Upon starting the program it will create a `config.toml` file in an OS-agnostic
-config file location:
+Upon starting the program it will create a [`config.toml`](config.example.toml)
+file in an OS-agnostic config file location:
 
 - Linux: `$XDG_CONFIG_HOME`, i.e. `$HOME/.config|/home/alice/.config`
 - macOS: `$HOME/Library/Application Support`, i.e. `/Users/Alice/Library/Application Support`
@@ -65,8 +65,8 @@ To check-in, you just need to press the `c` key as in **c**heck-in.
 
 There are several ways to install Dead Man's Switch:
 
-1. [Crates.io](https://crates.io/crates/dead-man-switch): `cargo install dead-man-switch`.
-1. [GitHub](https://github.com/storopoli/dead-man-switch): `cargo install --git https://github.com/storopoli/dead-man-switch`.
+1. [Crates.io](https://crates.io/crates/dead-man-switch): `cargo install dead-man-switch-tui`.
+1. [GitHub](https://github.com/storopoli/dead-man-switch): `cargo install --git https://github.com/storopoli/dead-man-switch -p dead-man-switch-tui`.
 1. From source: Clone the repository and run `cargo install --path .`.
 1. Using Nix: `nix run github:storopoli/dead-man-switch`.
 1. Using Nix Flakes: add this to your `flake.nix`:
@@ -110,7 +110,7 @@ To do so you can add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dead-man-switch = { version = "0.2", default-features = false }
+dead-man-switch = "0.4"
 ```
 
 Make sure that you're disabling the default features to avoid

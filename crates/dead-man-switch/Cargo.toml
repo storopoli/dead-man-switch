@@ -5,6 +5,7 @@ edition.workspace = true
 authors.workspace = true
 description.workspace = true
 license.workspace = true
+readme = "../../README.md"
 
 [dependencies]
 thiserror = "1"

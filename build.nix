@@ -1,7 +1,7 @@
 { lib, rustPlatform, rust, buildInputs, nativeBuildInputs, ... }:
 
 let
-  pname = "dead-man-switch";
+  pname = "dead-man-switch-tui";
   version = "0.4.0";
 
   buildRustPackage = rustPlatform.buildRustPackage.override {
