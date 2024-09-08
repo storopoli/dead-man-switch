@@ -5,8 +5,9 @@
     </head>
     <body>
         <h1>Dashboard</h1>
-        <p>Time left before warning: {{ time_left_warning }}</p>
-        <p>Time left before Dead Man's Switch triggers: {{ time_left_dead_man }}</p>
+        <p>Time type: {{ timer_type }}</p>
+        <p>Time left: {{ label }}</p>
+        <p>Percentage: {{ time_left_percentage }}</p>
          <!-- Checkin button -->
         <form action="/dashboard" method="post">
             <button type="submit">Check-In</button>

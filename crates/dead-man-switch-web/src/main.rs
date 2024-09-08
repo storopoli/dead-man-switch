@@ -62,8 +62,9 @@ struct LoginTemplate {
 #[derive(Template)]
 #[template(path = "dashboard.html")]
 struct DashboardTemplate {
-    time_left_warning: String,
-    time_left_dead_man: String,
+    timer_type: String,
+    time_left_percentage: u16,
+    label: String,
 }
 
 /// Timer loop to check for expired timers and send emails
@@ -98,9 +99,16 @@ async fn show_login(jar: PrivateCookieJar, State(state): State<SharedState>) -> 
     if let Some(cookie) = jar.get("auth") {
         if cookie.value() == "true" {
             let timer = state.app_state.timer.lock().await;
+            let timer_type = match timer.get_type() {
+                TimerType::Warning => "Warning".to_string(),
+                TimerType::DeadMan => "Dead Man".to_string(),
+            };
+            let time_left_percentage = timer.remaining_percent();
+            let label = timer.label();
             let dashboard_template = DashboardTemplate {
-                time_left_warning: format!("{:?}", timer.remaining_percent()),
-                time_left_dead_man: format!("{:?}", timer.remaining_percent()),
+                timer_type,
+                time_left_percentage,
+                label,
             };
             return Html(
                 dashboard_template
@@ -151,9 +159,16 @@ async fn show_dashboard(
     if let Some(cookie) = jar.get("auth") {
         if cookie.value() == "true" {
             let timer = state.app_state.timer.lock().await;
+            let timer_type = match timer.get_type() {
+                TimerType::Warning => "Warning".to_string(),
+                TimerType::DeadMan => "Dead Man".to_string(),
+            };
+            let time_left_percentage = timer.remaining_percent();
+            let label = timer.label();
             let dashboard_template = DashboardTemplate {
-                time_left_warning: format!("{:?}", timer.remaining_percent()),
-                time_left_dead_man: format!("{:?}", timer.remaining_percent()),
+                timer_type,
+                time_left_percentage,
+                label,
             };
             return Ok(Html(
                 dashboard_template
