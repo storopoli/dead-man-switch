@@ -21,7 +21,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-features -- -D warnings
       - name: rustfmt
         run: cargo fmt --all --check
 
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [stable, beta, "1.63.0"]
+        rust: [stable, beta, "1.81.0"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,4 +54,4 @@ jobs:
         run: |
           # Cleanup any previous deadman configuration
           rm -rf $XDG_CONFIG_HOME/deadman
-          cargo test --all-features --all-targets
+          cargo test --all-features

@@ -1,0 +1,13 @@
+[package]
+name = "dead-man-switch-tui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+
+[dependencies]
+dead-man-switch = { version = "0.4", path = "../dead-man-switch" }
+thiserror = "1"
+ratatui = "0.28"
+crossterm = "0.28"

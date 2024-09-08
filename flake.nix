@@ -34,7 +34,7 @@
           Security
         ];
 
-        msrv = pkgs.rust-bin.stable."1.63.0".default;
+        msrv = pkgs.rust-bin.stable."1.81.0".default;
 
         buildInputs = with pkgs; [
           bashInteractive

@@ -1,17 +1,9 @@
 {
   "name": "Rust",
 
-  "image": "mcr.microsoft.com/devcontainers/base:debian",
+  "image": "mcr.microsoft.com/devcontainers/rust",
 
-  "features": {
-    "ghcr.io/devcontainers/features/rust:1": {
-      "version": "1.63.0" // Rust MSRV for the project
-    },
-    // openssl stuff
-    "ghcr.io/devcontainers-contrib/features/apt-get-packages:1": {
-      "packages": "pkg-config,libssl-dev"
-    }
-  },
+  "forwardPorts": [3000],
 
   "customizations": {
     "vscode": {

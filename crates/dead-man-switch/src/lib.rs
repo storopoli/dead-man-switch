@@ -9,8 +9,3 @@
 pub mod config;
 pub mod email;
 pub mod timer;
-#[cfg(feature = "tui")]
-pub mod tui;
-
-#[cfg(feature = "tui")]
-pub use tui::run;

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Dead Man's Switch - Dashboard</title>
+         <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                padding: 20px;
+                margin: 0;
+            }
+            h1 {
+                font-size: 24px;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+            p {
+                font-size: 18px;
+                text-align: center;
+                margin: 5px 0;
+            }
+            form {
+                display: flex;
+                justify-content: center;
+                margin-top: 20px;
+            }
+            button {
+                background-color: #007BFF;
+                color: white;
+                padding: 10px 15px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+                margin: 5px;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+        </style>
+        <script>
+            // Function to fetch timer data every second and update the DOM
+            function updateDashboard() {
+                fetch('/timer')  // Fetch data from the server
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update the timer details in the page
+                        document.getElementById('timer_type').innerText = data.timer_type;
+                        document.getElementById('label').innerText = data.label;
+                        document.getElementById('time_left_percentage').innerText = data.time_left_percentage;
+                    })
+                    .catch(error => console.error('Error fetching timer data:', error));
+            }
+
+            // Set interval to update the dashboard every second
+            setInterval(updateDashboard, 1000);
+        </script>
+    </head>
+    <body onload="updateDashboard()">
+        <h1>Dashboard</h1>
+        <p>Timer: <span id="timer_type">{{ timer_type }}</span></p>
+        <p>Time left: <span id="label">{{ label }}</span></p>
+        <p>Percentage: <span id="time_left_percentage">{{ time_left_percentage }}</span></p>
+        <!-- Check-in button -->
+        <form action="/dashboard" method="post">
+            <button type="submit">Check-In</button>
+        </form>
+        <!-- Logout button -->
+        <form action="/logout" method="post">
+            <button type="submit">Logout</button>
+        </form>
+    </body>
+</html>
