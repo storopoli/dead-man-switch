@@ -9,7 +9,7 @@ use axum::{
     extract::{Form, FromRef, State},
     http::{Method, StatusCode},
     response::{Html, IntoResponse, Redirect},
-    routing::get,
+    routing::{get, post},
     serve, BoxError, Router,
 };
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar};
@@ -135,6 +135,14 @@ async fn handle_login(
     }
 }
 
+/// Handles the logout.
+async fn handle_logout(jar: PrivateCookieJar) -> impl IntoResponse {
+    // Remove the "auth" cookie by setting it with an empty value and "max-age" set to 0
+    let updated_jar = jar.remove(Cookie::from("auth"));
+    warn!("User logged out");
+    (updated_jar, Redirect::to("/"))
+}
+
 /// Shows the dashboard (protected page)
 async fn show_dashboard(
     jar: PrivateCookieJar,
@@ -217,6 +225,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(show_login).post(handle_login))
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
+        .route("/logout", post(handle_logout))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
