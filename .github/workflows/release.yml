@@ -21,15 +21,16 @@ jobs:
   cratesio:
     name: Publish Release to Crates.io
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        packages: ["dead-man-switch", "dead-man-switch-tui"]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
-    - name: Publish to Crates.io
-      run: cargo publish -p ${{ matrix.packages }}
+    - name: Publish to Crates.io - Library
+      run: cargo publish -p dead-man-switch
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    - name: Publish to Crates.io - TUI
+      run: cargo publish -p dead-man-switch-tui
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
