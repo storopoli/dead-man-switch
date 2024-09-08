@@ -1,0 +1,34 @@
+name: Build and Test Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+  workflow_dispatch: null
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: docker build -t dead_man_switch .
+
+    - name: Run Docker
+      run: docker run -d --name dead_man_switch -p 3000:3000 dead_man_switch
+
+    - name: Test Docker
+      run: |
+        sleep 10 # sleep for 10 seconds to allow the server to start
+        response=$(curl -s -o /dev/null -w "%{http_code}" localhost:3000/timer)
+        if [ "$response" -ne 401 ]; then
+            echo "Expected UNAUTHORIZED error, but got $response"
+            exit 1
+        fi
+
+    - name: Display Docker container logs
+      run: docker logs dead_man_switch
