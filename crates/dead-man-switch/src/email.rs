@@ -154,7 +154,6 @@ mod tests {
             attachment: None,
             timer_warning: 60,
             timer_dead_man: 120,
-            #[cfg(feature = "web")]
             web_password: "password".to_string(),
         }
     }
@@ -172,7 +171,7 @@ mod tests {
     fn test_create_email_with_attachment() {
         let mut config = get_test_config();
         // Assuming there's a test file at this path
-        config.attachment = Some(PathBuf::from("README.md"));
+        config.attachment = Some(PathBuf::from("Cargo.toml"));
         let email_result = config.create_email(Email::Warning);
         assert!(email_result.is_ok());
         let email_result = config.create_email(Email::DeadMan);

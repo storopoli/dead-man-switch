@@ -1,6 +1,5 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
-#[cfg(feature = "web")]
 use std::env;
 
 use std::fs::{self, File};
@@ -51,13 +50,11 @@ pub struct Config {
     /// Timer in seconds for the dead man's email.
     pub timer_dead_man: u64,
     /// Web interface password
-    #[cfg(feature = "web")]
     pub web_password: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        #[cfg(feature = "web")]
         let web_password = env::var("WEB_PASSWORD")
             .ok()
             .unwrap_or("password".to_string());
@@ -75,7 +72,6 @@ impl Default for Config {
             attachment: None,
             timer_warning: 60 * 60 * 24 * 14, // 2 weeks
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
-            #[cfg(feature = "web")]
             web_password,
         }
     }

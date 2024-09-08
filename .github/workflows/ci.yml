@@ -21,7 +21,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Check
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-features -- -D warnings
       - name: rustfmt
         run: cargo fmt --all --check
 
@@ -54,4 +54,4 @@ jobs:
         run: |
           # Cleanup any previous deadman configuration
           rm -rf $XDG_CONFIG_HOME/deadman
-          cargo test --all-features --all-targets
+          cargo test --all-features

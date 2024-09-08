@@ -238,7 +238,7 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
 /// - `title`: The title for the timer.
 /// - `current_percent`: The current percentage of the timer.
 /// - `label`: The label for the timer.
-/// - `gauge_style`: The [`GaugeStyle`] for the timer.
+/// - `gauge_style`: The [`Style`] for the timer.
 ///
 /// ## Notes
 ///

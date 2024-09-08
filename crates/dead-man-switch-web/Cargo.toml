@@ -7,7 +7,7 @@ description.workspace = true
 license.workspace = true
 
 [dependencies]
-dead-man-switch = { path = "../dead-man-switch", features = ["web"] }
+dead-man-switch = { path = "../dead-man-switch" }
 anyhow = "1.0.87"
 askama = "0.12.1"
 axum = "0.7.5"

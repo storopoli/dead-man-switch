@@ -137,8 +137,27 @@ fn format_duration(duration: ChronoDuration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::load_or_initialize_config;
+    use crate::config::Config;
     use std::thread::sleep;
+
+    fn get_test_config() -> Config {
+        Config {
+            username: "user@example.com".to_string(),
+            password: "password".to_string(),
+            smtp_server: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            message: "This is a test message".to_string(),
+            message_warning: "This is a test warning message".to_string(),
+            subject: "Test Subject".to_string(),
+            subject_warning: "Test Warning Subject".to_string(),
+            to: "recipient@example.com".to_string(),
+            from: "sender@example.com".to_string(),
+            attachment: None,
+            timer_warning: 60,
+            timer_dead_man: 120,
+            web_password: "password".to_string(),
+        }
+    }
 
     #[test]
     fn timer_creation() {
@@ -226,7 +245,7 @@ mod tests {
 
     #[test]
     fn reset_warning_timer_resets_start_time() {
-        let config = load_or_initialize_config().unwrap();
+        let config = get_test_config();
 
         let mut timer = Timer::new(
             TimerType::Warning,
@@ -243,7 +262,7 @@ mod tests {
 
     #[test]
     fn reset_dead_man_timer_promotes_to_warning_and_resets() {
-        let config = load_or_initialize_config().unwrap();
+        let config = get_test_config();
 
         let mut timer = Timer::new(
             TimerType::DeadMan,
