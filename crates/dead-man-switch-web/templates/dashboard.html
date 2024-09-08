@@ -1,7 +1,43 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Dashboard</title>
+        <title>Dead Man's Switch - Dashboard</title>
+         <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                padding: 20px;
+                margin: 0;
+            }
+            h1 {
+                font-size: 24px;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+            p {
+                font-size: 18px;
+                text-align: center;
+                margin: 5px 0;
+            }
+            form {
+                display: flex;
+                justify-content: center;
+                margin-top: 20px;
+            }
+            button {
+                background-color: #007BFF;
+                color: white;
+                padding: 10px 15px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+                margin: 5px;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+        </style>
         <script>
             // Function to fetch timer data every second and update the DOM
             function updateDashboard() {
