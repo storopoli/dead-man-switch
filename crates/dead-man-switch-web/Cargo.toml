@@ -9,7 +9,7 @@ readme = "../../README.md"
 
 [dependencies]
 dead-man-switch = { version = "0.4.0", path = "../dead-man-switch" }
-anyhow = "1.0.87"
+anyhow = "1.0.89"
 askama = "0.12.1"
 axum = "0.7.5"
 serde = { version = "1.0.128", features = ["derive"] }
