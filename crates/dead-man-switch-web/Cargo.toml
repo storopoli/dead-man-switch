@@ -14,7 +14,7 @@ askama = "0.12.1"
 axum = "0.7.5"
 serde = { version = "1.0.128", features = ["derive"] }
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros"] }
-tower-http = { version = "0.5.2", features = ["tracing", "trace", "cors"] }
+tower-http = { version = "0.6.1", features = ["tracing", "trace", "cors"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
