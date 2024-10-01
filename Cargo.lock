@@ -525,7 +525,7 @@ version = "0.4.0"
 dependencies = [
  "chrono",
  "directories-next",
- "lettre 0.11.8",
+ "lettre 0.11.9",
  "lettre_email",
  "mime_guess",
  "serde",
@@ -1211,9 +1211,9 @@ dependencies = [
 
 [[package]]
 name = "lettre"
-version = "0.11.8"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1658ac89b01055e3ba23d66ecf6f8b97388ebe34ce125e49f8ef71234fb8aaba"
+checksum = "69f204773bab09b150320ea1c83db41dc6ee606a4bc36dc1f43005fe7b58ce06"
 dependencies = [
  "base64 0.22.1",
  "chumsky",
