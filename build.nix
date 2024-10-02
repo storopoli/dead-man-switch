@@ -2,7 +2,7 @@
 
 let
   pname = "dead-man-switch-tui";
-  version = "0.4.0";
+  version = "0.4.1";
 
   buildRustPackage = rustPlatform.buildRustPackage.override {
     rustc = rust;
