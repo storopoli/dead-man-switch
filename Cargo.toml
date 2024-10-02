@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/dead-man-switch",
-    "crates/dead-man-switch-tui",
-    "crates/dead-man-switch-web",
+  "crates/dead-man-switch",
+  "crates/dead-man-switch-tui",
+  "crates/dead-man-switch-web",
 ]
 default-members = ["crates/dead-man-switch", "crates/dead-man-switch-tui"]
 
 [workspace.package]
 edition = "2021"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Jose Storopoli <jose@storopoli.io>"]
 description = "A simple no-BS Dead Man's Switch"
 license = "AGPL-3.0-only"
