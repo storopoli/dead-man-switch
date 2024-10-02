@@ -3,6 +3,7 @@
 [![AGPL-v3](https://img.shields.io/badge/License-AGPL&nbsp;v3-lightgrey.svg)](https://opensource.org/license/agpl-v3/)
 [![Crates.io](https://img.shields.io/crates/v/dead-man-switch)](https://crates.io/crates/dead-man-switch)
 [![docs](https://img.shields.io/crates/v/dead-man-switch?color=yellow&label=docs)](https://docs.rs/dead-man-switch)
+[![startos](https://img.shields.io/badge/startos-blue)](https://github.com/storopoli/dead-man-switch-startos)
 
 This is a simple implementation of a
 [Dead Man's Switch](https://en.wikipedia.org/wiki/Dead_man%27s_switch).
@@ -140,6 +141,15 @@ To use the web interface, please follow the instructions below:
 
 1. Make sure to [reverse proxy](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)
    the web interface with proper security measures such as HTTPS.
+
+## StartOS package
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/storopoli/dead-man-switch-startos/refs/heads/master/icon.png" alt="Project Logo" width="21%">
+</p>
+
+The Web Interface can be easy deployed to any device that runs [startos](https://start9.com/).
+Check the instructions at [`storopoli/dead-man-switch-startos`](https://github.com/storopoli/dead-man-switch-startos)
 
 ## License
 
