@@ -20,7 +20,7 @@ tracing-subscriber = "0.3.18"
 
 # Auth handling
 axum-extra = { version = "0.9.4", features = ["cookie", "cookie-private"] }
-bcrypt = "0.15.1"
+bcrypt = "0.16.0"
 
 # Rate limiting
 tower = { version = "0.5.1", features = ["buffer", "limit"] }
