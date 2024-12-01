@@ -127,11 +127,11 @@ async fn show_login(jar: PrivateCookieJar, State(state): State<SharedState>) -> 
         }
     }
     let login_template = LoginTemplate { error: false };
-    return Html(
+    Html(
         login_template
             .render()
             .expect("Failed to render login template"),
-    );
+    )
 }
 
 /// Handles the login.

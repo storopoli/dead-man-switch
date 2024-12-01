@@ -63,7 +63,7 @@ impl Timer {
     pub fn remaining_percent(&self) -> u16 {
         let elapsed = self.start.elapsed().as_secs();
         let total = self.duration.as_secs();
-        let remaining = if elapsed < total { total - elapsed } else { 0 };
+        let remaining = total.saturating_sub(elapsed);
         (remaining as f64 / total as f64 * 100.0) as u16
     }
 
