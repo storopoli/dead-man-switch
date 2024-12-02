@@ -9,6 +9,6 @@ readme = "../../README.md"
 
 [dependencies]
 dead-man-switch = { version = "0.4.1", path = "../dead-man-switch" }
-thiserror = "1"
+thiserror = "2"
 ratatui = "0.28"
 crossterm = "0.28"
