@@ -233,14 +233,14 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
 /// Contains a [`Gauge`] widget to display the timer.
 /// The timer will be updated every second.
 ///
-/// ## Parameters
+/// # Parameters
 ///
 /// - `title`: The title for the timer.
 /// - `current_percent`: The current percentage of the timer.
 /// - `label`: The label for the timer.
 /// - `gauge_style`: The [`Style`] for the timer.
 ///
-/// ## Notes
+/// # Notes
 ///
 /// The timer will be green if is still counting the warning time.
 /// Eventually, it will turn red when the warning time is done,

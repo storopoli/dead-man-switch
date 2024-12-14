@@ -1,6 +1,6 @@
 //! Web implementation for the Dead Man's Switch.
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use askama::Template;
@@ -19,8 +19,11 @@ use dead_man_switch::{
     timer::{Timer, TimerType},
 };
 use serde::Serialize;
-use tokio::sync::{Mutex, RwLock};
 use tokio::{net::TcpListener, time::sleep};
+use tokio::{
+    runtime::Handle,
+    sync::{Mutex, RwLock},
+};
 use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -28,6 +31,7 @@ use tower_http::{
 };
 use tracing::{info, subscriber, warn, Level};
 use tracing_subscriber::FmtSubscriber;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// App state.
 struct AppState {
@@ -36,21 +40,88 @@ struct AppState {
     timer: Mutex<Timer>,
 }
 
+/// Secret data to be zeroized.
+#[derive(Zeroize, ZeroizeOnDrop)]
+struct SecretData {
+    /// Password from the config.
+    password: String,
+    /// Hashed password from the config.
+    hashed_password: String,
+}
+
+/// Wrapper for [`Key`] that provides secure zeroization.
+#[derive(Clone)]
+struct SecureKey {
+    /// The wrapped [`Key`].
+    key: Key,
+    /// The pointer to the key's memory.
+    ///
+    /// Using an  `Arc<Mutex<Vec<u8>>>` to make the pointer thread-safe.
+    bytes: Arc<Mutex<Vec<u8>>>,
+}
+
+impl SecureKey {
+    /// Create a new [`SecureKey`] from a [`Key`].
+    fn new(key: Key) -> Self {
+        let bytes = key.master().to_vec();
+        Self {
+            key,
+            bytes: Arc::new(Mutex::new(bytes)),
+        }
+    }
+}
+
+impl Zeroize for SecureKey {
+    fn zeroize(&mut self) {
+        match Handle::try_current() {
+            Ok(rt) => {
+                // block_on returns the MutexGuard directly
+                let mut guard = rt.block_on(async { self.bytes.lock().await });
+                guard.zeroize();
+            }
+            Err(_) => {
+                // No runtime available, try to zeroize synchronously
+                if let Ok(mut guard) = self.bytes.try_lock() {
+                    guard.zeroize();
+                }
+            }
+        }
+    }
+}
+
+impl Drop for SecureKey {
+    fn drop(&mut self) {
+        // Use try_lock() instead of depending on the runtime
+        if let Ok(guard) = self.bytes.try_lock() {
+            let mut bytes = guard.to_vec();
+            bytes.zeroize();
+        }
+    }
+}
+
+impl Deref for SecureKey {
+    type Target = Key;
+
+    fn deref(&self) -> &Self::Target {
+        &self.key
+    }
+}
+
 /// Combined state containing both AppState and SecretState.
 #[derive(Clone)]
 struct SharedState {
     /// Dead Man's Switch [`AppState`].
     app_state: Arc<AppState>,
-    /// Hashed password from the config
-    hashed_password: String,
+    /// [`SecretData`] from the config.
+    secret_data: Arc<SecretData>,
     /// Secret key for cookie encryption.
-    key: Key,
+    key: SecureKey,
 }
 
 /// Tells [`PrivateCookieJar`] how to access the key from a [`SharedState`].
 impl FromRef<SharedState> for Key {
     fn from_ref(state: &SharedState) -> Self {
-        state.key.clone()
+        state.key.key.clone()
     }
 }
 
@@ -139,11 +210,17 @@ async fn handle_login(
     State(state): State<SharedState>,
     Form(params): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let jar = PrivateCookieJar::new(state.key.clone());
+    let jar = PrivateCookieJar::new(state.key.key.clone());
 
-    let user_password = params.get("password").expect("Password not found").clone();
+    let mut user_password = params.get("password").expect("Password not found").clone();
 
-    if verify(user_password, &state.hashed_password).expect("Failed to verify password") {
+    let is_valid = verify(&user_password, &state.secret_data.hashed_password)
+        .expect("Failed to verify password");
+
+    // Zeroize the user-provided password after use
+    user_password.zeroize();
+
+    if is_valid {
         let updated_jar = jar.add(Cookie::new("auth", "true"));
         (updated_jar, Redirect::to("/dashboard"))
     } else {
@@ -246,7 +323,13 @@ async fn main() -> anyhow::Result<()> {
     let config = load_or_initialize_config().context("Failed to load or initialize config")?;
     // Hash the password
     let password = config.web_password.clone();
-    let hashed_password = hash(password, DEFAULT_COST).expect("Failed to hash password");
+    let hashed_password = hash(&password, DEFAULT_COST).expect("Failed to hash password");
+
+    // Create a new SecretData
+    let secret_data = Arc::new(SecretData {
+        password,
+        hashed_password,
+    });
 
     // Create a new Timer
     let timer = Timer::new(
@@ -261,8 +344,8 @@ async fn main() -> anyhow::Result<()> {
     // Create combined shared state
     let shared_state = SharedState {
         app_state: app_state.clone(),
-        key: Key::generate(),
-        hashed_password,
+        key: SecureKey::new(Key::generate()),
+        secret_data,
     };
 
     // CORS Layer
@@ -303,5 +386,6 @@ async fn main() -> anyhow::Result<()> {
     serve(addr, app)
         .await
         .context("error while starting server")?;
+
     Ok(())
 }

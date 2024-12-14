@@ -66,9 +66,9 @@ To check-in, you just need to press the `c` key as in **c**heck-in.
 
 There are several ways to install Dead Man's Switch:
 
-1. [Crates.io](https://crates.io/crates/dead-man-switch): `cargo install dead-man-switch-tui`.
-1. [GitHub](https://github.com/storopoli/dead-man-switch): `cargo install --git https://github.com/storopoli/dead-man-switch -p dead-man-switch-tui`.
-1. From source: Clone the repository and run `cargo install --path .`.
+1. [Crates.io](https://crates.io/crates/dead-man-switch): `cargo install --locked dead-man-switch-tui`.
+1. [GitHub](https://github.com/storopoli/dead-man-switch): `cargo install --git --locked https://github.com/storopoli/dead-man-switch -p dead-man-switch-tui`.
+1. From source: Clone the repository and run `cargo install --locked --path .`.
 1. Using Nix: `nix run github:storopoli/dead-man-switch`.
 1. Using Nix Flakes: add this to your `flake.nix`:
 
@@ -110,7 +110,7 @@ To do so you can add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dead-man-switch = "0.4"
+dead-man-switch = "0.5"
 ```
 
 ## Web Interface
