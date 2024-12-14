@@ -20,7 +20,7 @@ use lettre::{
 };
 use thiserror::Error;
 
-use crate::config::{Config, Email};
+use crate::config::{attachment_path, Config, ConfigError, Email};
 
 /// Errors that can occur when sending an email.
 #[derive(Error, Debug)]
@@ -28,30 +28,38 @@ pub enum EmailError {
     /// TLS error when sending the email.
     #[error(transparent)]
     TlsError(#[from] smtp::Error),
+
     /// Error when parsing email addresses.
     #[error(transparent)]
     EmailError(#[from] AddressError),
+
     /// Error when building the email.
     #[error(transparent)]
     BuilderError(#[from] LettreError),
+
     /// Error when reading the attachment.
     #[error(transparent)]
     IoError(#[from] IoError),
+
     /// Error when determining the content type of the attachment.
     #[error(transparent)]
     InvalidContent(#[from] ContentTypeErr),
+
+    /// Error when determining the content type of the attachment.
+    #[error(transparent)]
+    AttachmentPath(#[from] ConfigError),
 }
 
 impl Config {
     /// Send the email using the provided configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// - If the email fails to send.
     /// - If the email cannot be created.
     /// - If the attachment cannot be read.
     ///
-    /// ## Notes
+    /// # Notes
     ///
     /// If the attachment MIME type cannot be determined, it will default to
     /// `application/octet-stream`.
@@ -103,7 +111,8 @@ impl Config {
         // Conditionally add the attachment for DeadMan email type
         if let Email::DeadMan = email_type {
             if let Some(attachment) = &self.attachment {
-                let filename = attachment
+                let attachment_path = attachment_path(self)?;
+                let filename = attachment_path
                     .file_name()
                     .ok_or_else(|| IoError::new(IoErrorKind::NotFound, "Failed to get filename"))?
                     .to_string_lossy();
@@ -137,7 +146,6 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn get_test_config() -> Config {
         Config {
@@ -171,7 +179,7 @@ mod tests {
     fn test_create_email_with_attachment() {
         let mut config = get_test_config();
         // Assuming there's a test file at this path
-        config.attachment = Some(PathBuf::from("Cargo.toml"));
+        config.attachment = Some("Cargo.toml".into());
         let email_result = config.create_email(Email::Warning);
         assert!(email_result.is_ok());
         let email_result = config.create_email(Email::DeadMan);

@@ -1,14 +1,17 @@
 [package]
 name = "dead-man-switch-web"
 edition = "2021"
-version = "0.4.2"
+version = "0.5.0"
 authors = ["Jose Storopoli <jose@storopoli.io>"]
 description = "A simple no-BS Dead Man's Switch Web Interface"
 license = "AGPL-3.0-only"
 readme = "../../README.md"
 
 [dependencies]
-dead-man-switch = { version = "0.4.2", path = "../dead-man-switch" }
+dead-man-switch.workspace = true
+
+zeroize.workspace = true
+
 anyhow = "1.0.92"
 askama = "0.12.1"
 axum = "0.7.9"

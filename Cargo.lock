@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "directories-next",
@@ -531,11 +531,12 @@ dependencies = [
  "serde",
  "thiserror 2.0.3",
  "toml",
+ "zeroize",
 ]
 
 [[package]]
 name = "dead-man-switch-tui"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "crossterm",
  "dead-man-switch",
@@ -545,7 +546,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch-web"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "askama",
@@ -559,6 +560,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "zeroize",
 ]
 
 [[package]]
@@ -2925,6 +2927,20 @@ name = "zeroize"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ced3678a2879b30306d323f4542626697a464a97c0a07c9aebf7ebca65cd4dde"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "zerovec"

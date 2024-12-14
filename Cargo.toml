@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/dead-man-switch",
-  "crates/dead-man-switch-tui",
-  "crates/dead-man-switch-web",
+    "crates/dead-man-switch",
+    "crates/dead-man-switch-tui",
+    "crates/dead-man-switch-web",
 ]
 default-members = ["crates/dead-man-switch", "crates/dead-man-switch-tui"]
 
@@ -14,6 +14,11 @@ authors = ["Jose Storopoli <jose@storopoli.io>"]
 description = "A simple no-BS Dead Man's Switch"
 license = "AGPL-3.0-only"
 readme = "README.md"
+
+[workspace.dependencies]
+dead-man-switch = { path = "crates/dead-man-switch", version = "0.5.0" }
+
+zeroize = { version = "1.8.1", features = ["derive"] }
 
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed

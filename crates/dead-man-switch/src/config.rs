@@ -10,14 +10,15 @@ use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Configuration struct used for the application
 ///
-/// ## Default
+/// # Default
 ///
 /// If the configuration file does not exist, it will be created with
 /// the default values.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct Config {
     /// The username for the email account.
     pub username: String,
@@ -44,7 +45,7 @@ pub struct Config {
     /// The email address to send the email from.
     pub from: String,
     /// Attachment to send with the email.
-    pub attachment: Option<PathBuf>,
+    pub attachment: Option<String>,
     /// Timer in seconds for the warning email.
     pub timer_warning: u64,
     /// Timer in seconds for the dead man's email.
@@ -80,15 +81,21 @@ impl Default for Config {
 /// Configuration errors
 #[derive(Error, Debug)]
 pub enum ConfigError {
-    /// IO operations on config module
+    /// IO operations on config module.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    /// TOML serialization
+
+    /// TOML serialization.
     #[error(transparent)]
     TomlSerialization(#[from] SerTomlError),
-    /// TOML deserialization
+
+    /// TOML deserialization.
     #[error(transparent)]
     TomlDeserialization(#[from] DerTomlError),
+
+    /// Attachment not found.
+    #[error("Attachment not found")]
+    AttachmentNotFound,
 }
 
 /// Enum to represent the type of email to send.
@@ -105,12 +112,12 @@ pub enum Email {
 /// Under the hood uses the [`directories_next`] crate to find the
 /// home directory and the config.
 ///
-/// ## Errors
+/// # Errors
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
 ///
-/// ## Notes
+/// # Notes
 ///
 /// This function handles testing and non-testing environments.
 pub fn config_path() -> Result<PathBuf, ConfigError> {
@@ -139,7 +146,7 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
 /// Under the hood uses the [`directories_next`] crate to find the
 /// home directory and the config.
 ///
-/// ## Errors
+/// # Errors
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
@@ -158,12 +165,12 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
 /// Under the hood uses the [`directories_next`] crate to find the
 /// home directory and the config.
 ///
-/// ## Errors
+/// # Errors
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
 /// use dead_man_switch::config::load_or_initialize_config;
@@ -182,6 +189,20 @@ pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
 
         Ok(config)
     }
+}
+
+/// Parses the attachment path from the [`Config`].
+///
+/// # Errors
+///
+/// - If the attachment path is not found.
+/// - If the attachment path is not a valid path.
+pub fn attachment_path(config: &Config) -> Result<PathBuf, ConfigError> {
+    let attachment_path = config
+        .attachment
+        .as_ref()
+        .ok_or(ConfigError::AttachmentNotFound)?;
+    Ok(PathBuf::from(attachment_path))
 }
 
 #[cfg(test)]
