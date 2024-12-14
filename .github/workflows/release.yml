@@ -43,3 +43,8 @@ jobs:
         run: cargo publish -p dead-man-switch-tui
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Publish to Crates.io - WEB
+        run: cargo publish -p dead-man-switch-web
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
