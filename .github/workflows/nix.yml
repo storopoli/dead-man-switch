@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Check Nix flake inputs
         uses: DeterminateSystems/flake-checker-action@v9
         with:
@@ -33,6 +36,8 @@ jobs:
     steps:
       - name: "Checkout Repo"
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: "Install Nix"
         uses: DeterminateSystems/nix-installer-action@v16
@@ -42,4 +47,3 @@ jobs:
 
       - name: "Test Nix Package"
         run: nix build -L .
-

@@ -1,5 +1,7 @@
 name: Build and Deploy Docker to GHCR
 
+permissions: {}
+
 # This workflow runs when any of the following occur:
 # - A push is made to a branch called `main`
 # - A tag starting with "v" is created
@@ -8,13 +10,13 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**.md'
-      - '**.txt'
+      - "**.md"
+      - "**.txt"
     tags:
       - v*
 env:
   IMAGE_NAME: dead_man_switch
-#
+
 jobs:
   # This publishes the image to GitHub Packages.
   publish:
@@ -26,6 +28,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Build image
         run: docker build . --file Dockerfile --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
@@ -34,17 +38,20 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
 
       - name: Push image
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          GITHUB_REF: ${{ github.ref }}
         run: |
-          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+          IMAGE_ID=ghcr.io/$REPO_OWNER/$IMAGE_NAME
 
           # This changes all uppercase characters to lowercase.
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
 
           # This strips the git ref prefix from the version.
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          VERSION=$(echo "$GITHUB_REF" | sed -e 's,.*/\(.*\),\1,')
 
           # This strips the "v" prefix from the tag name.
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          [[ "$GITHUB_REF" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
 
           # This uses the Docker `latest` tag convention.
           [ "$VERSION" == "main" ] && VERSION=latest

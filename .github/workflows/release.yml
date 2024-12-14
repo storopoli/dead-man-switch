@@ -1,7 +1,6 @@
 name: Build and upload binaries to release
 
-permissions:
-  contents: write
+permissions: {}
 
 on:
   push:
@@ -12,9 +11,14 @@ jobs:
   github:
     name: Publish Release on GitHub
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Upload binary to release
         uses: ncipollo/release-action@v1
 
@@ -22,15 +26,20 @@ jobs:
     name: Publish Release to Crates.io
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-    - name: Publish to Crates.io - Library
-      run: cargo publish -p dead-man-switch
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-    - name: Publish to Crates.io - TUI
-      run: cargo publish -p dead-man-switch-tui
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to Crates.io - Library
+        run: cargo publish -p dead-man-switch
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Publish to Crates.io - TUI
+        run: cargo publish -p dead-man-switch-tui
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
