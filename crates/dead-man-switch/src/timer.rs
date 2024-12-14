@@ -63,15 +63,26 @@ impl Timer {
     pub fn remaining_percent(&self) -> u16 {
         let elapsed = self.start.elapsed().as_secs();
         let total = self.duration.as_secs();
+        if elapsed >= total {
+            return 0;
+        }
         let remaining = total.saturating_sub(elapsed);
         (remaining as f64 / total as f64 * 100.0) as u16
     }
 
     /// Update label based on the remaining time
     pub fn label(&self) -> String {
-        let remaining = self.duration - self.start.elapsed();
-        let remaining_chrono =
-            ChronoDuration::try_seconds(remaining.as_secs() as i64).expect("Invalid duration");
+        let elapsed = self.start.elapsed();
+        if elapsed >= self.duration {
+            return "0 second(s)".to_string();
+        }
+
+        let remaining = self
+            .duration
+            .checked_sub(elapsed)
+            .unwrap_or(Duration::from_secs(0));
+        let remaining_chrono = ChronoDuration::try_seconds(remaining.as_secs() as i64)
+            .unwrap_or(ChronoDuration::zero());
         format_duration(remaining_chrono)
     }
 
