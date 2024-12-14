@@ -1,7 +1,7 @@
 [package]
 name = "dead-man-switch"
 edition = "2021"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Jose Storopoli <jose@storopoli.io>"]
 description = "A simple no-BS Dead Man's Switch"
 license = "AGPL-3.0-only"
