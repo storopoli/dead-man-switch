@@ -1,19 +1,19 @@
 [package]
 name = "dead-man-switch"
 edition = "2021"
-version = "0.5.0"
-authors = ["Jose Storopoli <jose@storopoli.io>"]
+version.workspace = true
+authors.workspace = true
 description = "A simple no-BS Dead Man's Switch"
 license = "AGPL-3.0-only"
 readme = "../../README.md"
 
 [dependencies]
-thiserror = "2"
-serde = { version = "1", features = ["derive"] }
-toml = "0.8"
-directories-next = "2"
-lettre = { version = "0.11", features = ["rustls-tls", "builder"] }
-lettre_email = "0.9"
-mime_guess = "2"
-chrono = "0.4"
+thiserror = "2.0.9"
+serde = { version = "1.0.217", features = ["derive"] }
+toml = "0.8.19"
+directories-next = "2.0.0"
+lettre = { version = "0.11.11", features = ["rustls-tls", "builder"] }
+lettre_email = "0.9.4"
+mime_guess = "2.0.5"
+chrono = "0.4.39"
 zeroize.workspace = true
