@@ -1,8 +1,8 @@
 [package]
 name = "dead-man-switch-tui"
 edition = "2021"
-version = "0.5.0"
-authors = ["Jose Storopoli <jose@storopoli.io>"]
+version.workspace = true
+authors.workspace = true
 description = "A simple no-BS Dead Man's Switch Tui Interface"
 license = "AGPL-3.0-only"
 readme = "../../README.md"
@@ -10,6 +10,6 @@ readme = "../../README.md"
 [dependencies]
 dead-man-switch.workspace = true
 
-thiserror = "2"
-ratatui = "0.28"
-crossterm = "0.28"
+thiserror = "2.0.9"
+ratatui = "0.29.0"
+crossterm = "0.28.1"
