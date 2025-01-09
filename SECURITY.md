@@ -11,6 +11,6 @@ In general, use your best judgement in determining whether an issue is a securit
 If not, go ahead and post it to the public issue tracker.
 
 **If you believe you are aware of a security issue**, please contact Jose Storopoli at
-`jose@storopoli.io`.
+`jose@storopoli.com`.
 You may GPG-encrypt this email to his public key, which
-[can be downloaded from his website here](https://storopoli.io/assets/publickey.txt).
+[can be downloaded from his website here](https://storopoli.com/publickey.txt).
