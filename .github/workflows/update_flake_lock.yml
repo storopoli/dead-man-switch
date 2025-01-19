@@ -9,6 +9,9 @@ permissions: {}
 jobs:
   lockfile:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create commits
+      pull-requests: write # Needed to create a PR
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
