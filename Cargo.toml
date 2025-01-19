@@ -9,14 +9,14 @@ default-members = ["crates/dead-man-switch", "crates/dead-man-switch-tui"]
 
 [workspace.package]
 edition = "2021"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["Jose Storopoli <jose@storopoli.com>"]
 description = "A simple no-BS Dead Man's Switch"
 license = "AGPL-3.0-only"
 readme = "README.md"
 
 [workspace.dependencies]
-dead-man-switch = { path = "crates/dead-man-switch", version = "0.5.1" }
+dead-man-switch = { path = "crates/dead-man-switch", version = "0.6.0" }
 
 zeroize = { version = "1.8.1", features = ["derive"] }
 
