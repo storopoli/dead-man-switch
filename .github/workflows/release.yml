@@ -1,11 +1,11 @@
 name: Build and upload binaries to release
 
-permissions: {}
-
 on:
   push:
     tags:
       - "v*"
+
+permissions: {}
 
 jobs:
   github:

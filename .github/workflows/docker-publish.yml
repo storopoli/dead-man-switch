@@ -1,7 +1,5 @@
 name: Build and Deploy Docker to GHCR
 
-permissions: {}
-
 # This workflow runs when any of the following occur:
 # - A push is made to a branch called `main`
 # - A tag starting with "v" is created
@@ -16,6 +14,8 @@ on:
       - v*
 env:
   IMAGE_NAME: dead_man_switch
+
+permissions: {}
 
 jobs:
   # This publishes the image to GitHub Packages.
