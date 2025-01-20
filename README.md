@@ -36,7 +36,7 @@ the switch automatically sends the desired message.
 Upon starting the program it will create a [`config.toml`](config.example.toml)
 file in an OS-agnostic config file location:
 
-- Linux: `$XDG_CONFIG_HOME`, i.e. `$HOME/.config|/home/alice/.config`
+- Linux: `$XDG_CONFIG_HOME`, i.e. `$HOME/.config`, `/home/alice/.config`
 - macOS: `$HOME/Library/Application Support`, i.e. `/Users/Alice/Library/Application Support`
 - Windows: `{FOLDERID_RoamingAppData}`, i.e. `C:\Users\Alice\AppData\Roaming`
 
