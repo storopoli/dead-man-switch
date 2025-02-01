@@ -45,7 +45,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v16
 
       - name: "Nix Cache"
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+        uses: DeterminateSystems/magic-nix-cache-action@v9
 
       - name: "Test Nix Package"
         run: nix build -L .
