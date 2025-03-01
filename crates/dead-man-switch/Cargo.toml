@@ -9,7 +9,7 @@ readme = "../../README.md"
 
 [dependencies]
 thiserror = "2.0.11"
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { version = "1.0.218", features = ["derive"] }
 toml = "0.8.19"
 directories-next = "2.0.0"
 lettre = { version = "0.11.11", features = ["rustls-tls", "builder"] }

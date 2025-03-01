@@ -15,7 +15,7 @@ zeroize.workspace = true
 anyhow = "1.0.96"
 askama = "0.12.1"
 axum = "0.8.1"
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { version = "1.0.218", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
 tower-http = { version = "0.6.2", features = ["tracing", "trace", "cors"] }
 tracing = "0.1.41"
