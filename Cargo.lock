@@ -551,6 +551,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "bcrypt",
+ "cookie",
  "dead-man-switch",
  "serde",
  "tokio",

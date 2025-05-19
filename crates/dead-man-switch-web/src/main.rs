@@ -13,6 +13,7 @@ use axum::{
     serve, BoxError, Json, Router,
 };
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar};
+use cookie::time::Duration as CookieDuration;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use dead_man_switch::{
     config::{load_or_initialize_config, Config, Email},
@@ -221,7 +222,9 @@ async fn handle_login(
     user_password.zeroize();
 
     if is_valid {
-        let updated_jar = jar.add(Cookie::new("auth", "true"));
+        let mut cookie = Cookie::new("auth", "true");
+        cookie.set_max_age(Some(CookieDuration::days(30)));
+        let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
         warn!("Unauthorized access to check-in");
@@ -263,7 +266,7 @@ async fn show_dashboard(
             ));
         }
     }
-    warn!("Unauthorized access to check-in");
+    warn!("Unauthorized access to dashboard");
     Err(Redirect::to("/"))
 }
 
@@ -277,11 +280,12 @@ async fn handle_check_in(
             let config = state.app_state.config.read().await;
             let mut timer = state.app_state.timer.lock().await;
             timer.reset(&config);
+            info!("Check-in using web interface");
             return Ok(Redirect::to("/dashboard"));
         }
     }
     warn!("Unauthorized access to check-in");
-    Err(StatusCode::UNAUTHORIZED)
+    Err(Redirect::to("/"))
 }
 
 /// Endpoint to serve the current timer data in JSON
@@ -359,6 +363,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
+        .route("/reset", get (handle_check_in))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
