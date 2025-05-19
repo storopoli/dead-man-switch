@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
-// use std::str::FromStr;
 
 use lettre::{
     address::AddressError,
@@ -16,7 +15,6 @@ use lettre::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    // Address, 
     Message, SmtpTransport, Transport,
 };
 use thiserror::Error;
