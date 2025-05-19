@@ -342,7 +342,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Save path for reset without auth
-    let path = &config.route_to_reset.clone();
+    let path_to_reset = &config.route_to_reset.clone();
 
     // Create a new Timer
     let timer = Timer::new(
@@ -372,7 +372,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
-        .route(path, get (handle_reset_without_auth))
+        .route(path_to_reset, get (handle_reset_without_auth))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
