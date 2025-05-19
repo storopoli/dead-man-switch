@@ -8,7 +8,8 @@ license = "AGPL-3.0-only"
 readme = "../../README.md"
 
 [dependencies]
-dead-man-switch.workspace = true
+# dead-man-switch.workspace = true
+dead-man-switch = { path = "../dead-man-switch" }
 
 zeroize.workspace = true
 

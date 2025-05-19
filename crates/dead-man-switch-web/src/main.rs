@@ -284,6 +284,16 @@ async fn handle_check_in(
     Err(StatusCode::UNAUTHORIZED)
 }
 
+/// Reset without auth
+async fn handle_reset_without_auth(
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    let config = state.app_state.config.read().await;
+    let mut timer = state.app_state.timer.lock().await;
+    timer.reset(&config);
+    (StatusCode::OK, "Reset ok")
+}
+
 /// Endpoint to serve the current timer data in JSON
 async fn timer_data(
     jar: PrivateCookieJar,
@@ -315,7 +325,7 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::WARN)
         .finish();
     subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
@@ -330,6 +340,9 @@ async fn main() -> anyhow::Result<()> {
         password,
         hashed_password,
     });
+
+    // Save path for reset without auth
+    let path = &config.route_to_reset.clone();
 
     // Create a new Timer
     let timer = Timer::new(
@@ -359,6 +372,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
+        .route(path, get (handle_reset_without_auth))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
