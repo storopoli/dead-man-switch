@@ -15,3 +15,4 @@ attachment = "/root/important_file.gpg"                                         
 timer_warning = 1209600                                                                                                                                  # 2 weeks
 timer_dead_man = 604800                                                                                                                                  # 1 week
 web_password = "password"
+cookie_exp_days = 7

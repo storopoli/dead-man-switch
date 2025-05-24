@@ -223,7 +223,8 @@ async fn handle_login(
 
     if is_valid {
         let mut cookie = Cookie::new("auth", "true");
-        cookie.set_max_age(Some(CookieDuration::days(30)));
+        let config = state.app_state.config.read().await;
+        cookie.set_max_age(Some(CookieDuration::days(config.cookie_exp_days)));
         let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
@@ -363,7 +364,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
-        .route("/reset", get (handle_check_in))
+        .route("/check-in", get (handle_check_in))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
