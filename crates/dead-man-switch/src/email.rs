@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
-use std::str::FromStr;
 
 use lettre::{
     address::AddressError,
@@ -16,7 +15,7 @@ use lettre::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    Address, Message, SmtpTransport, Transport,
+    Message, SmtpTransport, Transport,
 };
 use thiserror::Error;
 
@@ -87,13 +86,25 @@ impl Config {
         let from = Mailbox::new(None, self.from.parse()?);
         // Adjust the email to based on the email type
         let to = match email_type {
-            Email::Warning => Address::from_str(&self.from)?,
-            Email::DeadMan => Address::from_str(&self.to)?,
+            Email::Warning => &self.from,
+            Email::DeadMan => &self.to,
         };
-        let to = Mailbox::new(None, to);
+
+        // parse the comma‐separated list into a Vec<Mailbox>
+        let mailboxes: Vec<Mailbox> = to
+            .split(',')
+            .map(str::trim)
+            .map(|addr| addr.parse::<Mailbox>().expect("invalid email address"))
+            .collect();
 
         // Adjust the email builder based on the email type
-        let email_builder = Message::builder().from(from).to(to);
+        let mut email_builder = Message::builder().from(from);
+
+        // Add recipients
+        for mbox in mailboxes {
+            email_builder = email_builder.to(mbox);
+        }
+
         let email_builder = match email_type {
             Email::Warning => email_builder.subject(&self.subject_warning),
             Email::DeadMan => email_builder.subject(&self.subject),
@@ -157,7 +168,7 @@ mod tests {
             message_warning: "This is a test warning message".to_string(),
             subject: "Test Subject".to_string(),
             subject_warning: "Test Warning Subject".to_string(),
-            to: "recipient@example.com".to_string(),
+            to: "recipient@example.com, recipient2@example.com".to_string(),
             from: "sender@example.com".to_string(),
             attachment: None,
             timer_warning: 60,
