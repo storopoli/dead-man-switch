@@ -92,10 +92,10 @@ impl Config {
 
         // parse the comma‐separated list into a Vec<Mailbox>
         let mailboxes: Vec<Mailbox> = to
-        .split(',')
-        .map(str::trim)
-        .map(|addr| addr.parse::<Mailbox>().expect("invalid email address"))
-        .collect();
+            .split(',')
+            .map(str::trim)
+            .map(|addr| addr.parse::<Mailbox>().expect("invalid email address"))
+            .collect();
 
         // Adjust the email builder based on the email type
         let mut email_builder = Message::builder().from(from);
