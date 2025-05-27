@@ -396,3 +396,45 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_test_config() -> Config {
+        Config {
+            username: "user@example.com".to_string(),
+            password: "password".to_string(),
+            smtp_server: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            message: "This is a test message".to_string(),
+            message_warning: "This is a test warning message".to_string(),
+            subject: "Test Subject".to_string(),
+            subject_warning: "Test Warning Subject".to_string(),
+            to: "recipient@example.com".to_string(),
+            from: "sender@example.com".to_string(),
+            attachment: None,
+            timer_warning: 60,
+            timer_dead_man: 120,
+            web_password: "password".to_string(),
+            cookie_exp_days: 7,
+        }
+    }
+
+    #[test]
+    fn test_cookie_duration_conversion() {
+        let mut c = Cookie::new("name", "value");
+        let config = get_test_config();
+        let duration = Duration::from_secs(config.cookie_exp_days * 3600 * 24)
+            .try_into()
+            .expect("should be able to convert from `std::time::Duration`");
+        
+        println!("Duration: {}", duration);
+        assert_eq!(c.max_age(), None);
+        c.set_max_age(duration);
+        assert_eq!(c.max_age(), Some(duration));
+        c.set_max_age(None);
+        assert!(c.max_age().is_none());
+    }
+}
