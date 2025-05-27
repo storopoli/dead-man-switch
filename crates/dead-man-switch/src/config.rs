@@ -53,7 +53,7 @@ pub struct Config {
     /// Web interface password
     pub web_password: String,
     /// Cookie expiration to avoid need for login
-    pub cookie_exp_days: i64
+    pub cookie_exp_days: u64
 }
 
 impl Default for Config {

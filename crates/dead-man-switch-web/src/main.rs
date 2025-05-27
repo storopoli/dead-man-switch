@@ -13,7 +13,6 @@ use axum::{
     serve, BoxError, Json, Router,
 };
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar};
-use cookie::time::Duration as CookieDuration;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use dead_man_switch::{
     config::{load_or_initialize_config, Config, Email},
@@ -224,7 +223,9 @@ async fn handle_login(
     if is_valid {
         let mut cookie = Cookie::new("auth", "true");
         let config = state.app_state.config.read().await;
-        cookie.set_max_age(Some(CookieDuration::days(config.cookie_exp_days)));
+        cookie.set_max_age(Some(Duration::from_secs(config.cookie_exp_days * 3600 * 24)
+            .try_into()
+            .expect("should be able to convert from `std::time::Duration`")));
         let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
