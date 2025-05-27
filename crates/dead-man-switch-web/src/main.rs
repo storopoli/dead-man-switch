@@ -287,7 +287,7 @@ async fn handle_check_in(
         }
     }
     warn!("Unauthorized access to check-in");
-    Err(Redirect::to("/"))
+    Err(StatusCode::UNAUTHORIZED)
 }
 
 /// Endpoint to serve the current timer data in JSON
@@ -365,7 +365,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
-        .route("/check-in", get (handle_check_in))
+        .route("/check-in", get(handle_check_in))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
