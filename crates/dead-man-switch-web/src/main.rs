@@ -407,7 +407,7 @@ mod tests {
     fn test_cookie_duration_conversion() {
         let mut c = Cookie::new("name", "value");
         let config = Config::default();
-        let duration = Duration::from_secs(config.cookie_exp_days * 3600 * 24)
+        let duration = Duration::from_secs(config.cookie_exp_days * 60 * 60 * 24)
             .try_into()
             .expect("should be able to convert from `std::time::Duration`");
 
