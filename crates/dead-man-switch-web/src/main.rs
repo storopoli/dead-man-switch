@@ -223,9 +223,11 @@ async fn handle_login(
     if is_valid {
         let mut cookie = Cookie::new("auth", "true");
         let config = state.app_state.config.read().await;
-        cookie.set_max_age(Some(Duration::from_secs(config.cookie_exp_days * 3600 * 24)
-            .try_into()
-            .expect("should be able to convert from `std::time::Duration`")));
+        cookie.set_max_age(Some(
+            Duration::from_secs(config.cookie_exp_days * 3600 * 24)
+                .try_into()
+                .expect("should be able to convert from `std::time::Duration`"),
+        ));
         let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
@@ -397,7 +399,6 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -409,7 +410,7 @@ mod tests {
         let duration = Duration::from_secs(config.cookie_exp_days * 3600 * 24)
             .try_into()
             .expect("should be able to convert from `std::time::Duration`");
-        
+
         c.set_max_age(duration);
         assert_eq!(c.max_age(), Some(duration));
     }
