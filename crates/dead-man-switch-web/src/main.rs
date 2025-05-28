@@ -212,7 +212,10 @@ async fn handle_login(
 ) -> impl IntoResponse {
     let jar = PrivateCookieJar::new(state.key.key.clone());
 
-    let mut user_password = params.get("password").expect("Password not found").clone();
+    let Some(mut user_password) = params.get("password").cloned() else {
+        warn!("Password field is empty");
+        return (jar, Redirect::to("/"));
+    };
 
     let is_valid = verify(&user_password, &state.secret_data.hashed_password)
         .expect("Failed to verify password");
