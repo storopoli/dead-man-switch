@@ -221,7 +221,14 @@ async fn handle_login(
     user_password.zeroize();
 
     if is_valid {
-        let updated_jar = jar.add(Cookie::new("auth", "true"));
+        let mut cookie = Cookie::new("auth", "true");
+        let config = state.app_state.config.read().await;
+        cookie.set_max_age(Some(
+            Duration::from_secs(config.cookie_exp_days * 3600 * 24)
+                .try_into()
+                .expect("should be able to convert from `std::time::Duration`"),
+        ));
+        let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
         warn!("Unauthorized access to check-in");
@@ -263,7 +270,7 @@ async fn show_dashboard(
             ));
         }
     }
-    warn!("Unauthorized access to check-in");
+    warn!("Unauthorized access to dashboard");
     Err(Redirect::to("/"))
 }
 
@@ -277,6 +284,7 @@ async fn handle_check_in(
             let config = state.app_state.config.read().await;
             let mut timer = state.app_state.timer.lock().await;
             timer.reset(&config);
+            info!("Check-in using web interface");
             return Ok(Redirect::to("/dashboard"));
         }
     }
@@ -359,6 +367,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
+        .route("/check-in", get(handle_check_in))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
@@ -388,4 +397,21 @@ async fn main() -> anyhow::Result<()> {
         .context("error while starting server")?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cookie_duration_conversion() {
+        let mut c = Cookie::new("name", "value");
+        let config = Config::default();
+        let duration = Duration::from_secs(config.cookie_exp_days * 60 * 60 * 24)
+            .try_into()
+            .expect("should be able to convert from `std::time::Duration`");
+
+        c.set_max_age(duration);
+        assert_eq!(c.max_age(), Some(duration));
+    }
 }

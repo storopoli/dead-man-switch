@@ -52,6 +52,8 @@ pub struct Config {
     pub timer_dead_man: u64,
     /// Web interface password
     pub web_password: String,
+    /// Cookie expiration to avoid need for login
+    pub cookie_exp_days: u64,
 }
 
 impl Default for Config {
@@ -74,6 +76,7 @@ impl Default for Config {
             timer_warning: 60 * 60 * 24 * 14, // 2 weeks
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
             web_password,
+            cookie_exp_days: 7,
         }
     }
 }
