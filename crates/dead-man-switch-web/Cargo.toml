@@ -12,7 +12,7 @@ dead-man-switch.workspace = true
 
 zeroize.workspace = true
 
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 askama = "0.14.0"
 axum = "0.8.4"
 serde = { version = "1.0.218", features = ["derive"] }
