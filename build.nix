@@ -1,25 +1,23 @@
-{ lib, rustPlatform, rust, buildInputs, nativeBuildInputs, ... }:
+{ lib, rustPlatform, rust, buildInputs, nativeBuildInputs, package_version, ...
+}:
 
 let
   pname = "dead-man-switch-tui";
-  version = "0.4.1";
+  version = package_version;
 
   buildRustPackage = rustPlatform.buildRustPackage.override {
     rustc = rust;
     cargo = rust;
   };
-in
 
-buildRustPackage {
+in buildRustPackage {
   inherit pname version;
 
   doCheck = false;
 
   src = ./.;
 
-  cargoLock = {
-    lockFile = ./Cargo.lock;
-  };
+  cargoLock = { lockFile = ./Cargo.lock; };
 
   inherit buildInputs nativeBuildInputs;
 

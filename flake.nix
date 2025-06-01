@@ -1,7 +1,7 @@
 {
   description = "Rust no-BS Dead Man's Switch";
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
 
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -21,33 +21,25 @@
       let
         overlays = [ (import rust-overlay) ];
 
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+        pkgs = import nixpkgs { inherit system overlays; };
 
         lib = pkgs.lib;
         stdenv = pkgs.stdenv;
 
         isDarwin = stdenv.isDarwin;
-        libsDarwin = with pkgs.darwin.apple_sdk.frameworks; lib.optionals isDarwin [
-          # Additional darwin specific inputs can be set here
-          Security
-        ];
+        libsDarwin = with pkgs.darwin.apple_sdk.frameworks;
+          lib.optionals isDarwin [
+            # Additional darwin specific inputs can be set here
+            Security
+          ];
 
         msrv = pkgs.rust-bin.stable."1.81.0".default;
 
-        buildInputs = with pkgs; [
-          bashInteractive
-          msrv
-          openssl
-        ] ++ libsDarwin;
-        nativeBuildInputs = with pkgs;
-          [
-            pkg-config
-          ];
-      in
-      with pkgs;
-      {
+        package_version = "0.7.0";
+
+        buildInputs = with pkgs; [ bashInteractive msrv openssl ] ++ libsDarwin;
+        nativeBuildInputs = with pkgs; [ pkg-config ];
+      in with pkgs; {
         checks = {
           pre-commit-check = pre-commit-hooks.lib.${system}.run {
             src = ./.;
@@ -63,20 +55,18 @@
           };
         };
 
-        devShells.default =
-          let
-            # pre-commit-checks
-            _shellHook = (self.checks.${system}.pre-commit-check.shellHook or "");
-          in
-          mkShell {
-            inherit buildInputs;
+        devShells.default = let
+          # pre-commit-checks
+          _shellHook = (self.checks.${system}.pre-commit-check.shellHook or "");
+        in mkShell {
+          inherit buildInputs;
 
-            shellHook = "${ _shellHook}";
-          };
+          shellHook = "${_shellHook}";
+        };
 
-        packages. default = import ./build.nix {
+        packages.default = import ./build.nix {
           inherit (pkgs) lib rustPlatform;
-          inherit buildInputs nativeBuildInputs;
+          inherit buildInputs nativeBuildInputs package_version;
           rust = msrv;
         };
 
