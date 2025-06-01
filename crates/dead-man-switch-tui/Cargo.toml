@@ -10,6 +10,6 @@ readme = "../../README.md"
 [dependencies]
 dead-man-switch.workspace = true
 
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 ratatui = "0.29.0"
 crossterm = "0.29.0"
