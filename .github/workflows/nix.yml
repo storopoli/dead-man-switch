@@ -25,6 +25,9 @@ jobs:
 
   config-tests:
     name: "${{ matrix.os-name }} Nix Test"
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
