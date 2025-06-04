@@ -129,10 +129,12 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
         std::env::temp_dir()
     } else {
         BaseDirs::new()
-            .ok_or_else(|| ConfigError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Failed to find home directory"
-            )))?
+            .ok_or_else(|| {
+                ConfigError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Failed to find home directory",
+                ))
+            })?
             .config_dir()
             .to_path_buf()
     };
