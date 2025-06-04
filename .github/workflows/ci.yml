@@ -26,6 +26,9 @@ jobs:
         with:
           components: clippy, rustfmt
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+
       - name: Check
         run: cargo clippy --all-features -- -D warnings
 
@@ -42,6 +45,9 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@fcf085fcb4b4b8f63f96906cd713eb52181b5ea4 # stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
 
       - name: cargo doc
         env:
@@ -64,6 +70,9 @@ jobs:
         uses: dtolnay/rust-toolchain@fcf085fcb4b4b8f63f96906cd713eb52181b5ea4 # stable
         with:
           toolchain: ${{ matrix.rust }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
 
       - name: Run tests
         run: |
