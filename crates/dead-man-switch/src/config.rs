@@ -216,32 +216,33 @@ pub fn attachment_path(config: &Config) -> Result<PathBuf, ConfigError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::thread;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{
+        env, file, process, thread,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
-    // Use a temporary directory approach that's more resilient
+    /// Use a temporary directory approach that's more resilient.
     fn get_isolated_test_dir() -> PathBuf {
         let thread_id = format!("{:?}", thread::current().id());
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let pid = std::process::id();
+        let pid = process::id();
 
-        let test_dir = std::env::temp_dir()
-            .join("deadman_test_isolated")
-            .join(format!(
-                "{}_{}_{}_{}",
-                std::file!().replace(['/', '\\'], "_"),
-                pid,
-                thread_id.replace([':', '(', ')'], "_"),
-                timestamp
-            ));
+        let test_dir = env::temp_dir().join("deadman_test_isolated").join(format!(
+            "{}_{}_{}_{}",
+            file!().replace(['/', '\\'], "_"),
+            pid,
+            thread_id.replace([':', '(', ')'], "_"),
+            timestamp
+        ));
 
         fs::create_dir_all(&test_dir).expect("Failed to create test directory");
         test_dir
     }
 
+    /// Save the configuration to the given path.
     fn save_config_with_path(config: &Config, path: &PathBuf) -> Result<(), ConfigError> {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
