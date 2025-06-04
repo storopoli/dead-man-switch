@@ -3,7 +3,7 @@
 use std::env;
 
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 use directories_next::BaseDirs;
@@ -130,8 +130,8 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
     } else {
         BaseDirs::new()
             .ok_or_else(|| {
-                ConfigError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
+                ConfigError::Io(io::Error::new(
+                    io::ErrorKind::NotFound,
                     "Failed to find home directory",
                 ))
             })?
