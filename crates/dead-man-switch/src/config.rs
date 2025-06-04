@@ -129,7 +129,10 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
         std::env::temp_dir()
     } else {
         BaseDirs::new()
-            .expect("Failed to find home directory")
+            .ok_or_else(|| ConfigError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Failed to find home directory"
+            )))?
             .config_dir()
             .to_path_buf()
     };
@@ -140,7 +143,7 @@ pub fn config_path() -> Result<PathBuf, ConfigError> {
         "deadman"
     });
 
-    fs::create_dir_all(&config_dir).expect("Failed to create config directory");
+    fs::create_dir_all(&config_dir)?;
     Ok(config_dir.join("config.toml"))
 }
 

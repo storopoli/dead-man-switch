@@ -156,14 +156,14 @@ async fn main_timer_loop(app_state: Arc<AppState>) {
         if timer.expired() {
             match timer.get_type() {
                 TimerType::Warning => {
-                    config
-                        .send_email(Email::Warning)
-                        .expect("Failed to send warning email");
+                    if let Err(e) = config.send_email(Email::Warning) {
+                        warn!("Failed to send warning email: {}", e);
+                    }
                 }
                 TimerType::DeadMan => {
-                    config
-                        .send_email(Email::DeadMan)
-                        .expect("Failed to send dead man email");
+                    if let Err(e) = config.send_email(Email::DeadMan) {
+                        warn!("Failed to send dead man email: {}", e);
+                    }
                     break;
                 }
             }
@@ -190,19 +190,17 @@ async fn show_login(jar: PrivateCookieJar, State(state): State<SharedState>) -> 
                 time_left_percentage,
                 label,
             };
-            return Html(
-                dashboard_template
-                    .render()
-                    .expect("Failed to render dashboard"),
-            );
+            return match dashboard_template.render() {
+                Ok(html) => Html(html),
+                Err(_) => Html("<h1>Error rendering dashboard</h1>".to_string()),
+            };
         }
     }
     let login_template = LoginTemplate { error: false };
-    Html(
-        login_template
-            .render()
-            .expect("Failed to render login template"),
-    )
+    match login_template.render() {
+        Ok(html) => Html(html),
+        Err(_) => Html("<h1>Error rendering login page</h1>".to_string()),
+    }
 }
 
 /// Handles the login.
@@ -222,8 +220,13 @@ async fn handle_login(
         }
     };
 
-    let is_valid = verify(&user_password, &state.secret_data.hashed_password)
-        .expect("Failed to verify password");
+    let is_valid = match verify(&user_password, &state.secret_data.hashed_password) {
+        Ok(valid) => valid,
+        Err(e) => {
+            warn!("Failed to verify password: {}", e);
+            false
+        }
+    };
 
     // Zeroize the user-provided password after use
     user_password.zeroize();
@@ -231,11 +234,9 @@ async fn handle_login(
     if is_valid {
         let mut cookie = Cookie::new("auth", "true");
         let config = state.app_state.config.read().await;
-        cookie.set_max_age(Some(
-            Duration::from_secs(config.cookie_exp_days * 3600 * 24)
-                .try_into()
-                .expect("should be able to convert from `std::time::Duration`"),
-        ));
+        if let Ok(max_age) = Duration::from_secs(config.cookie_exp_days * 3600 * 24).try_into() {
+            cookie.set_max_age(Some(max_age));
+        }
         let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
@@ -271,11 +272,10 @@ async fn show_dashboard(
                 time_left_percentage,
                 label,
             };
-            return Ok(Html(
-                dashboard_template
-                    .render()
-                    .expect("Failed to render dashboard"),
-            ));
+            return match dashboard_template.render() {
+                Ok(html) => Ok(Html(html)),
+                Err(_) => Ok(Html("<h1>Error rendering dashboard</h1>".to_string())),
+            };
         }
     }
     warn!("Unauthorized access to dashboard");
@@ -333,13 +333,15 @@ async fn main() -> anyhow::Result<()> {
         // will be written to stdout.
         .with_max_level(Level::TRACE)
         .finish();
-    subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    subscriber::set_global_default(subscriber)
+        .map_err(|e| anyhow::anyhow!("Setting default subscriber failed: {}", e))?;
 
     // Instantiate the Config
     let config = load_or_initialize_config().context("Failed to load or initialize config")?;
     // Hash the password
     let password = config.web_password.clone();
-    let hashed_password = hash(&password, DEFAULT_COST).expect("Failed to hash password");
+    let hashed_password = hash(&password, DEFAULT_COST)
+        .map_err(|e| anyhow::anyhow!("Failed to hash password: {}", e))?;
 
     // Create a new SecretData
     let secret_data = Arc::new(SecretData {
@@ -398,7 +400,7 @@ async fn main() -> anyhow::Result<()> {
     let port = 3000_u16;
     let addr = TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
-        .expect("Failed to bind to port");
+        .context("Failed to bind to port")?;
     info!("router initialized, listening on port {:?}", port);
     serve(addr, app)
         .await
@@ -417,7 +419,7 @@ mod tests {
         let config = Config::default();
         let duration = Duration::from_secs(config.cookie_exp_days * 60 * 60 * 24)
             .try_into()
-            .expect("should be able to convert from `std::time::Duration`");
+            .unwrap(); // Test environment - this should never fail
 
         c.set_max_age(duration);
         assert_eq!(c.max_age(), Some(duration));
