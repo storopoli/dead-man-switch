@@ -29,7 +29,7 @@ use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
-use tracing::{info, subscriber, warn, Level};
+use tracing::{error, info, subscriber, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -157,12 +157,12 @@ async fn main_timer_loop(app_state: Arc<AppState>) {
             match timer.get_type() {
                 TimerType::Warning => {
                     if let Err(e) = config.send_email(Email::Warning) {
-                        warn!("Failed to send warning email: {}", e);
+                        error!(?e, "failed to send warning email");
                     }
                 }
                 TimerType::DeadMan => {
                     if let Err(e) = config.send_email(Email::DeadMan) {
-                        warn!("Failed to send dead man email: {}", e);
+                        error!(?e, "failed to send dead man email");
                     }
                     break;
                 }
@@ -215,7 +215,7 @@ async fn handle_login(
         Some(password) if !password.is_empty() => password.clone(),
         _ => {
             // Password field is missing or empty, return login page logging the error
-            warn!("Login attempt with missing or empty password");
+            warn!("login attempt with missing or empty password");
             return (jar, Redirect::to("/"));
         }
     };
@@ -223,7 +223,7 @@ async fn handle_login(
     let is_valid = match verify(&user_password, &state.secret_data.hashed_password) {
         Ok(valid) => valid,
         Err(e) => {
-            warn!("Failed to verify password: {}", e);
+            error!(?e, "failed to verify password");
             false
         }
     };
@@ -240,7 +240,7 @@ async fn handle_login(
         let updated_jar = jar.add(cookie);
         (updated_jar, Redirect::to("/dashboard"))
     } else {
-        warn!("Unauthorized access to check-in");
+        warn!("unauthorized access to check-in");
         (jar, Redirect::to("/"))
     }
 }
@@ -249,7 +249,7 @@ async fn handle_login(
 async fn handle_logout(jar: PrivateCookieJar) -> impl IntoResponse {
     // Remove the "auth" cookie by setting it with an empty value and "max-age" set to 0
     let updated_jar = jar.remove(Cookie::from("auth"));
-    warn!("User logged out");
+    info!("user logged out");
     (updated_jar, Redirect::to("/"))
 }
 
@@ -278,7 +278,7 @@ async fn show_dashboard(
             };
         }
     }
-    warn!("Unauthorized access to dashboard");
+    warn!("unauthorized access to dashboard");
     Err(Redirect::to("/"))
 }
 
@@ -292,11 +292,11 @@ async fn handle_check_in(
             let config = state.app_state.config.read().await;
             let mut timer = state.app_state.timer.lock().await;
             timer.reset(&config);
-            info!("Check-in using web interface");
+            info!("check-in using web interface");
             return Ok(Redirect::to("/dashboard"));
         }
     }
-    warn!("Unauthorized access to check-in");
+    warn!("unauthorized access to check-in");
     Err(StatusCode::UNAUTHORIZED)
 }
 
@@ -321,7 +321,7 @@ async fn timer_data(
             return Ok(Json(data));
         }
     }
-    warn!("Unauthorized access to timer data");
+    warn!("unauthorized access to timer data");
     Err(StatusCode::UNAUTHORIZED)
 }
 
@@ -401,7 +401,7 @@ async fn main() -> anyhow::Result<()> {
     let addr = TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
         .context("Failed to bind to port")?;
-    info!("router initialized, listening on port {:?}", port);
+    info!(port, "router initialized, listening on port");
     serve(addr, app)
         .await
         .context("error while starting server")?;
