@@ -218,7 +218,7 @@ mod test {
     use super::*;
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
-    
+
     // Use a temporary directory approach that's more resilient
     fn get_isolated_test_dir() -> PathBuf {
         let thread_id = format!("{:?}", thread::current().id());
@@ -227,16 +227,17 @@ mod test {
             .unwrap()
             .as_nanos();
         let pid = std::process::id();
-        
+
         let test_dir = std::env::temp_dir()
             .join("deadman_test_isolated")
-            .join(format!("{}_{}_{}_{}", 
+            .join(format!(
+                "{}_{}_{}_{}",
                 std::file!().replace(['/', '\\'], "_"),
                 pid,
                 thread_id.replace([':', '(', ')'], "_"),
                 timestamp
             ));
-        
+
         fs::create_dir_all(&test_dir).expect("Failed to create test directory");
         test_dir
     }
@@ -264,13 +265,13 @@ mod test {
         let test_dir = get_isolated_test_dir();
         let test_path = test_dir.join("config.toml");
         let config = Config::default();
-        
+
         // Test saving and loading with our isolated functions
         save_config_with_path(&config, &test_path).unwrap();
-        
+
         let loaded_config = load_config_from_path(&test_path).unwrap();
         assert_eq!(loaded_config, Config::default());
-        
+
         // Cleanup - remove the entire test directory
         let _ = fs::remove_dir_all(&test_dir);
     }
@@ -280,14 +281,14 @@ mod test {
         let test_dir = get_isolated_test_dir();
         let test_path = test_dir.join("config.toml");
         let config = Config::default();
-        
+
         // Save config first
         save_config_with_path(&config, &test_path).unwrap();
-        
+
         // Load it back
         let loaded_config = load_config_from_path(&test_path).unwrap();
         assert_eq!(loaded_config, Config::default());
-        
+
         // Cleanup - remove the entire test directory
         let _ = fs::remove_dir_all(&test_dir);
     }
@@ -297,7 +298,7 @@ mod test {
         // This test verifies that config_path() uses temp directory in test mode
         let path = config_path().unwrap();
         assert!(path.to_string_lossy().contains("deadman_test"));
-        
+
         // Cleanup any created directories
         if let Some(parent) = path.parent() {
             let _ = fs::remove_dir_all(parent);
