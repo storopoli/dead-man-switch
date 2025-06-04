@@ -35,7 +35,7 @@
 
         msrv = pkgs.rust-bin.stable."1.81.0".default;
 
-        package_version = "0.7.0";
+        package_version = "0.7.1";
 
         buildInputs = with pkgs; [ bashInteractive msrv openssl ] ++ libsDarwin;
         nativeBuildInputs = with pkgs; [ pkg-config ];
