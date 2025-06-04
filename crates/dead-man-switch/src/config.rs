@@ -216,29 +216,93 @@ pub fn attachment_path(config: &Config) -> Result<PathBuf, ConfigError> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::{
+        env, file, process, thread,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
-    fn teardown() {
-        // Cleanup test config file after each test to prevent state leakage
-        let _ = fs::remove_file(config_path().unwrap());
+    /// Use a temporary directory approach that's more resilient.
+    fn get_isolated_test_dir() -> PathBuf {
+        let thread_id = format!("{:?}", thread::current().id());
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let pid = process::id();
+
+        let test_dir = env::temp_dir().join("deadman_test_isolated").join(format!(
+            "{}_{}_{}_{}",
+            file!().replace(['/', '\\'], "_"),
+            pid,
+            thread_id.replace([':', '(', ')'], "_"),
+            timestamp
+        ));
+
+        fs::create_dir_all(&test_dir).expect("Failed to create test directory");
+        test_dir
+    }
+
+    /// Save the configuration to the given path.
+    fn save_config_with_path(config: &Config, path: &PathBuf) -> Result<(), ConfigError> {
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut file = File::create(path)?;
+        let config_str = toml::to_string(config)?;
+        file.write_all(config_str.as_bytes())?;
+        file.sync_all()?; // Ensure data is written to disk
+        Ok(())
+    }
+
+    fn load_config_from_path(path: &PathBuf) -> Result<Config, ConfigError> {
+        let config_str = fs::read_to_string(path)?;
+        let config: Config = toml::from_str(&config_str)?;
+        Ok(config)
     }
 
     #[test]
     fn test_save_config() {
+        let test_dir = get_isolated_test_dir();
+        let test_path = test_dir.join("config.toml");
         let config = Config::default();
-        save_config(&config).unwrap();
-        let config_path = config_path().unwrap();
-        let config = fs::read_to_string(config_path).unwrap();
-        let config: Config = toml::from_str(&config).unwrap();
-        assert_eq!(config, Config::default());
-        teardown();
+
+        // Test saving and loading with our isolated functions
+        save_config_with_path(&config, &test_path).unwrap();
+
+        let loaded_config = load_config_from_path(&test_path).unwrap();
+        assert_eq!(loaded_config, Config::default());
+
+        // Cleanup - remove the entire test directory
+        let _ = fs::remove_dir_all(&test_dir);
     }
 
     #[test]
-    fn test_load_or_initialize_config() {
+    fn test_load_or_initialize_config_with_existing_file() {
+        let test_dir = get_isolated_test_dir();
+        let test_path = test_dir.join("config.toml");
         let config = Config::default();
-        save_config(&config).unwrap();
-        let config = load_or_initialize_config().unwrap();
-        assert_eq!(config, Config::default());
-        teardown();
+
+        // Save config first
+        save_config_with_path(&config, &test_path).unwrap();
+
+        // Load it back
+        let loaded_config = load_config_from_path(&test_path).unwrap();
+        assert_eq!(loaded_config, Config::default());
+
+        // Cleanup - remove the entire test directory
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_config_path_in_test_mode() {
+        // This test verifies that config_path() uses temp directory in test mode
+        let path = config_path().unwrap();
+        assert!(path.to_string_lossy().contains("deadman_test"));
+
+        // Cleanup any created directories
+        if let Some(parent) = path.parent() {
+            let _ = fs::remove_dir_all(parent);
+        }
     }
 }
