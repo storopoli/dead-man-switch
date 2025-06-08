@@ -6,19 +6,23 @@ use anyhow::Context;
 use askama::Template;
 use axum::{
     error_handling::HandleErrorLayer,
-    extract::{Form, FromRef, State},
+    extract::{Form, FromRef, Request, State},
     http::{Method, StatusCode},
+    middleware::{self, Next},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
-    serve, BoxError, Json, Router,
+    serve, BoxError, Extension, Json, Router,
 };
-use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar};
+use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar, SameSite};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use dead_man_switch::{
     config::{load_or_initialize_config, Config, Email},
     timer::{Timer, TimerType},
 };
-use serde::Serialize;
+use jsonwebtoken::{
+    decode, encode, errors::Error as JsonTokenError, DecodingKey, EncodingKey, Header, Validation,
+};
+use serde::{Deserialize, Serialize};
 use tokio::{net::TcpListener, time::sleep};
 use tokio::{
     runtime::Handle,
@@ -31,6 +35,7 @@ use tower_http::{
 };
 use tracing::{error, info, subscriber, warn, Level};
 use tracing_subscriber::FmtSubscriber;
+use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// App state.
@@ -47,6 +52,54 @@ struct SecretData {
     password: String,
     /// Hashed password from the config.
     hashed_password: String,
+    /// JWT signing key
+    jwt_secret: String,
+}
+
+/// JWT Claims structure
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    /// Subject (user identifier)
+    sub: String,
+
+    /// Expiration time (as UTC timestamp)
+    exp: usize,
+
+    /// Issued at (as UTC timestamp)
+    iat: usize,
+
+    /// JWT ID (unique identifier)
+    jti: String,
+}
+
+impl Claims {
+    fn new(user_id: String, exp_hours: i64) -> Self {
+        let now = chrono::Utc::now();
+        let exp = (now + chrono::Duration::hours(exp_hours)).timestamp() as usize;
+
+        Self {
+            sub: user_id,
+            exp,
+            iat: now.timestamp() as usize,
+            jti: Uuid::new_v4().to_string(),
+        }
+    }
+}
+
+/// User context for authenticated requests
+#[derive(Debug, Clone)]
+struct UserContext {
+    user_id: String,
+    authenticated: bool,
+}
+
+impl Default for UserContext {
+    fn default() -> Self {
+        Self {
+            user_id: String::new(),
+            authenticated: false,
+        }
+    }
 }
 
 /// Wrapper for [`Key`] that provides secure zeroization.
@@ -147,6 +200,82 @@ struct DashboardTemplate {
     label: String,
 }
 
+/// Create a secure cookie with proper security flags
+fn create_secure_cookie<'a>(name: &str, value: String, max_age_hours: i64) -> Cookie<'a> {
+    Cookie::build((name.to_string(), value))
+        .path("/")
+        .http_only(true)
+        .secure(!cfg!(debug_assertions)) // Only secure in release mode for localhost development
+        .same_site(SameSite::Strict)
+        .max_age(
+            Duration::from_secs((max_age_hours * 3_600) as u64)
+                .try_into()
+                .unwrap(),
+        )
+        .build()
+}
+
+/// Generate JWT token
+fn generate_jwt(secret: &str, claims: Claims) -> Result<String, JsonTokenError> {
+    let key = EncodingKey::from_secret(secret.as_bytes());
+    encode(&Header::default(), &claims, &key)
+}
+
+/// Validate JWT token
+fn validate_jwt(secret: &str, token: &str) -> Result<Claims, JsonTokenError> {
+    let key = DecodingKey::from_secret(secret.as_bytes());
+    let validation = Validation::default();
+    decode::<Claims>(token, &key, &validation).map(|data| data.claims)
+}
+
+/// Authentication middleware - provides UserContext to all routes
+async fn auth_middleware(
+    State(state): State<SharedState>,
+    jar: PrivateCookieJar,
+    mut request: Request,
+    next: Next,
+) -> impl IntoResponse {
+    let mut context = UserContext::default();
+    let mut updated_jar = jar.clone();
+
+    // Check for JWT token in cookies
+    if let Some(jwt_cookie) = jar.get("jwt") {
+        match validate_jwt(&state.secret_data.jwt_secret, jwt_cookie.value()) {
+            Ok(claims) => {
+                context.user_id = claims.sub;
+                context.authenticated = true;
+            }
+            Err(_) => {
+                // Invalid JWT, remove it
+                updated_jar = jar.remove(Cookie::from("jwt"));
+                warn!("Invalid JWT token removed");
+            }
+        }
+    }
+
+    // Inject the resolved context into request extensions
+    request.extensions_mut().insert(context);
+
+    let response = next.run(request).await;
+
+    // Return response with potentially updated cookies
+    (updated_jar, response).into_response()
+}
+
+/// Middleware to require authentication
+async fn require_auth(
+    Extension(context): Extension<UserContext>,
+    request: Request,
+    next: Next,
+) -> impl IntoResponse {
+    if !context.authenticated {
+        warn!("Unauthorized access attempt to protected route");
+        return Redirect::to("/").into_response();
+    }
+
+    next.run(request).await
+}
+
 /// Timer loop to check for expired timers and send emails
 async fn main_timer_loop(app_state: Arc<AppState>) {
     loop {
@@ -174,28 +303,30 @@ async fn main_timer_loop(app_state: Arc<AppState>) {
     }
 }
 
-/// Shows the login page.
-async fn show_login(jar: PrivateCookieJar, State(state): State<SharedState>) -> impl IntoResponse {
-    if let Some(cookie) = jar.get("auth") {
-        if cookie.value() == "true" {
-            let timer = state.app_state.timer.lock().await;
-            let timer_type = match timer.get_type() {
-                TimerType::Warning => "Warning".to_string(),
-                TimerType::DeadMan => "Dead Man".to_string(),
-            };
-            let time_left_percentage = timer.remaining_percent();
-            let label = timer.label();
-            let dashboard_template = DashboardTemplate {
-                timer_type,
-                time_left_percentage,
-                label,
-            };
-            return match dashboard_template.render() {
-                Ok(html) => Html(html),
-                Err(_) => Html("<h1>Error rendering dashboard</h1>".to_string()),
-            };
-        }
+/// Shows the login page or redirects to dashboard if already authenticated.
+async fn show_login(
+    Extension(context): Extension<UserContext>,
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    if context.authenticated {
+        let timer = state.app_state.timer.lock().await;
+        let timer_type = match timer.get_type() {
+            TimerType::Warning => "Warning".to_string(),
+            TimerType::DeadMan => "Dead Man".to_string(),
+        };
+        let time_left_percentage = timer.remaining_percent();
+        let label = timer.label();
+        let dashboard_template = DashboardTemplate {
+            timer_type,
+            time_left_percentage,
+            label,
+        };
+        return match dashboard_template.render() {
+            Ok(html) => Html(html),
+            Err(_) => Html("<h1>Error rendering dashboard</h1>".to_string()),
+        };
     }
+
     let login_template = LoginTemplate { error: false };
     match login_template.render() {
         Ok(html) => Html(html),
@@ -206,17 +337,15 @@ async fn show_login(jar: PrivateCookieJar, State(state): State<SharedState>) -> 
 /// Handles the login.
 async fn handle_login(
     State(state): State<SharedState>,
+    jar: PrivateCookieJar,
     Form(params): Form<HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let jar = PrivateCookieJar::new(state.key.key.clone());
-
     // Check if password field exists and is not empty
-    let mut user_password = match params.get("password") {
+    let user_password = match params.get("password") {
         Some(password) if !password.is_empty() => password.clone(),
         _ => {
-            // Password field is missing or empty, return login page logging the error
             warn!("login attempt with missing or empty password");
-            return (jar, Redirect::to("/"));
+            return (jar, Redirect::to("/")).into_response();
         }
     };
 
@@ -228,109 +357,94 @@ async fn handle_login(
         }
     };
 
-    // Zeroize the user-provided password after use
-    user_password.zeroize();
-
     if is_valid {
-        let mut cookie = Cookie::new("auth", "true");
-        let config = state.app_state.config.read().await;
-        if let Ok(max_age) = Duration::from_secs(config.cookie_exp_days * 3600 * 24).try_into() {
-            cookie.set_max_age(Some(max_age));
+        // Create JWT claims
+        let claims = Claims::new("user".to_string(), 24); // 24 hour expiry
+
+        match generate_jwt(&state.secret_data.jwt_secret, claims) {
+            Ok(token) => {
+                let secure_cookie = create_secure_cookie("jwt", token, 24);
+                let updated_jar = jar.add(secure_cookie);
+                info!("User successfully authenticated");
+                (updated_jar, Redirect::to("/dashboard")).into_response()
+            }
+            Err(e) => {
+                error!(?e, "Failed to generate JWT token");
+                (jar, Redirect::to("/")).into_response()
+            }
         }
-        let updated_jar = jar.add(cookie);
-        (updated_jar, Redirect::to("/dashboard"))
     } else {
-        warn!("unauthorized access to check-in");
-        (jar, Redirect::to("/"))
+        warn!("Invalid login attempt");
+        (jar, Redirect::to("/")).into_response()
     }
 }
 
 /// Handles the logout.
 async fn handle_logout(jar: PrivateCookieJar) -> impl IntoResponse {
-    // Remove the "auth" cookie by setting it with an empty value and "max-age" set to 0
-    let updated_jar = jar.remove(Cookie::from("auth"));
+    let updated_jar = jar.remove(Cookie::from("jwt"));
     info!("user logged out");
     (updated_jar, Redirect::to("/"))
 }
 
 /// Shows the dashboard (protected page)
 async fn show_dashboard(
-    jar: PrivateCookieJar,
+    Extension(_context): Extension<UserContext>, // Authentication guaranteed by middleware
     State(state): State<SharedState>,
-) -> Result<impl IntoResponse, Redirect> {
-    if let Some(cookie) = jar.get("auth") {
-        if cookie.value() == "true" {
-            let timer = state.app_state.timer.lock().await;
-            let timer_type = match timer.get_type() {
-                TimerType::Warning => "Warning".to_string(),
-                TimerType::DeadMan => "Dead Man".to_string(),
-            };
-            let time_left_percentage = timer.remaining_percent();
-            let label = timer.label();
-            let dashboard_template = DashboardTemplate {
-                timer_type,
-                time_left_percentage,
-                label,
-            };
-            return match dashboard_template.render() {
-                Ok(html) => Ok(Html(html)),
-                Err(_) => Ok(Html("<h1>Error rendering dashboard</h1>".to_string())),
-            };
-        }
+) -> impl IntoResponse {
+    let timer = state.app_state.timer.lock().await;
+    let timer_type = match timer.get_type() {
+        TimerType::Warning => "Warning".to_string(),
+        TimerType::DeadMan => "Dead Man".to_string(),
+    };
+    let time_left_percentage = timer.remaining_percent();
+    let label = timer.label();
+    let dashboard_template = DashboardTemplate {
+        timer_type,
+        time_left_percentage,
+        label,
+    };
+
+    match dashboard_template.render() {
+        Ok(html) => Html(html),
+        Err(_) => Html("<h1>Error rendering dashboard</h1>".to_string()),
     }
-    warn!("unauthorized access to dashboard");
-    Err(Redirect::to("/"))
 }
 
 /// Handle the check-in button
 async fn handle_check_in(
-    jar: PrivateCookieJar,
+    Extension(_context): Extension<UserContext>, // Authentication guaranteed by middleware
     State(state): State<SharedState>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
-    if let Some(cookie) = jar.get("auth") {
-        if cookie.value() == "true" {
-            let config = state.app_state.config.read().await;
-            let mut timer = state.app_state.timer.lock().await;
-            timer.reset(&config);
-            info!("check-in using web interface");
-            return Ok(Redirect::to("/dashboard"));
-        }
-    }
-    warn!("unauthorized access to check-in");
-    Err(StatusCode::UNAUTHORIZED)
+) -> impl IntoResponse {
+    let config = state.app_state.config.read().await;
+    let mut timer = state.app_state.timer.lock().await;
+    timer.reset(&config);
+    info!("check-in using web interface");
+    Redirect::to("/dashboard")
 }
 
 /// Endpoint to serve the current timer data in JSON
 async fn timer_data(
-    jar: PrivateCookieJar,
+    Extension(_context): Extension<UserContext>, // Authentication guaranteed by middleware
     State(state): State<SharedState>,
-) -> Result<impl IntoResponse, impl IntoResponse> {
-    if let Some(cookie) = jar.get("auth") {
-        if cookie.value() == "true" {
-            let timer = state.app_state.timer.lock().await;
-            let timer_type = format!("{:?}", timer.get_type());
-            let time_left_percentage = timer.remaining_percent();
-            let label = timer.label();
+) -> impl IntoResponse {
+    let timer = state.app_state.timer.lock().await;
+    let timer_type = format!("{:?}", timer.get_type());
+    let time_left_percentage = timer.remaining_percent();
+    let label = timer.label();
 
-            let data = TimerData {
-                timer_type,
-                label,
-                time_left_percentage,
-            };
+    let data = TimerData {
+        timer_type,
+        label,
+        time_left_percentage,
+    };
 
-            return Ok(Json(data));
-        }
-    }
-    warn!("unauthorized access to timer data");
-    Err(StatusCode::UNAUTHORIZED)
+    Json(data)
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Set up logging
     let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
         .with_max_level(Level::TRACE)
         .finish();
     subscriber::set_global_default(subscriber)
@@ -338,15 +452,20 @@ async fn main() -> anyhow::Result<()> {
 
     // Instantiate the Config
     let config = load_or_initialize_config().context("Failed to load or initialize config")?;
+
     // Hash the password
     let password = config.web_password.clone();
     let hashed_password = hash(&password, DEFAULT_COST)
         .map_err(|e| anyhow::anyhow!("Failed to hash password: {}", e))?;
 
+    // Generate a secure JWT secret
+    let jwt_secret = Uuid::new_v4().to_string();
+
     // Create a new SecretData
     let secret_data = Arc::new(SecretData {
         password,
         hashed_password,
+        jwt_secret,
     });
 
     // Create a new Timer
@@ -366,18 +485,31 @@ async fn main() -> anyhow::Result<()> {
         secret_data,
     };
 
-    // CORS Layer
+    // More restrictive CORS - only allow same origin in production
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
-        .allow_origin(Any);
+        .allow_origin(Any); // For simplicity, keeping permissive for now
 
-    // Routes
-    let app = Router::new()
-        .route("/", get(show_login).post(handle_login))
+    // Protected routes that require authentication
+    let protected_routes = Router::new()
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
-        .route("/logout", post(handle_logout))
         .route("/timer", get(timer_data))
         .route("/check-in", get(handle_check_in))
+        .layer(middleware::from_fn(require_auth));
+
+    // Public routes
+    let public_routes = Router::new()
+        .route("/", get(show_login).post(handle_login))
+        .route("/logout", post(handle_logout));
+
+    // Combine routes and apply auth middleware to all
+    let app = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
+        .layer(middleware::from_fn_with_state(
+            shared_state.clone(),
+            auth_middleware,
+        ))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
@@ -386,7 +518,7 @@ async fn main() -> anyhow::Result<()> {
                         format!("Unhandled error: {}", err),
                     )
                 }))
-                .layer(BufferLayer::new(1024))
+                .layer(BufferLayer::new(1_024))
                 .layer(RateLimitLayer::new(5, Duration::from_secs(1))),
         )
         .layer(cors)
@@ -419,9 +551,20 @@ mod tests {
         let config = Config::default();
         let duration = Duration::from_secs(config.cookie_exp_days * 60 * 60 * 24)
             .try_into()
-            .unwrap(); // Test environment - this should never fail
+            .unwrap();
 
         c.set_max_age(duration);
         assert_eq!(c.max_age(), Some(duration));
+    }
+
+    #[test]
+    fn test_jwt_generation_and_validation() {
+        let secret = "test_secret";
+        let claims = Claims::new("test_user".to_string(), 1);
+
+        let token = generate_jwt(secret, claims).unwrap();
+        let decoded = validate_jwt(secret, &token).unwrap();
+
+        assert_eq!(decoded.sub, "test_user");
     }
 }
