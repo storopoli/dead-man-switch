@@ -31,7 +31,7 @@ the switch automatically sends the desired message.
 ## How it Works
 
 > If you want a very simple explanation and the motivation behind the project,
-> check my blog post [here](https://storopoli.com/blog/dead-man-switch/).
+> check my blog post [here](https://storopoli.com/posts/2024-03-23-dead-man-switch.html).
 
 Upon starting the program it will create a [`config.toml`](config.example.toml)
 file in an OS-agnostic config file location:
