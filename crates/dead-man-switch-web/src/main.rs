@@ -87,19 +87,10 @@ impl Claims {
 }
 
 /// User context for authenticated requests
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct UserContext {
     user_id: String,
     authenticated: bool,
-}
-
-impl Default for UserContext {
-    fn default() -> Self {
-        Self {
-            user_id: String::new(),
-            authenticated: false,
-        }
-    }
 }
 
 /// Wrapper for [`Key`] that provides secure zeroization.
@@ -515,7 +506,7 @@ async fn main() -> anyhow::Result<()> {
                 .layer(HandleErrorLayer::new(|err: BoxError| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Unhandled error: {}", err),
+                        format!("Unhandled error: {err}"),
                     )
                 }))
                 .layer(BufferLayer::new(1_024))
