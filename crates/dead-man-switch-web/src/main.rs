@@ -87,13 +87,11 @@ impl Claims {
 }
 
 /// User context for authenticated requests
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 struct UserContext {
     user_id: String,
     authenticated: bool,
 }
-
 
 /// Wrapper for [`Key`] that provides secure zeroization.
 #[derive(Clone)]
