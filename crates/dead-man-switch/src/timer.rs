@@ -130,13 +130,13 @@ fn format_duration(duration: ChronoDuration) -> String {
     let mut parts = vec![];
 
     if days > 0 {
-        parts.push(format!("{} day(s)", days));
+        parts.push(format!("{days} day(s)"));
     }
     if hours > 0 {
-        parts.push(format!("{} hour(s)", hours));
+        parts.push(format!("{hours} hour(s)"));
     }
     if minutes > 0 {
-        parts.push(format!("{} minute(s)", minutes));
+        parts.push(format!("{minutes} minute(s)"));
     }
     if seconds > 0 || parts.is_empty() {
         parts.push(format!("{} second(s)", seconds + 1));
