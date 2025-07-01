@@ -29,8 +29,8 @@ jobs:
         run: |
           sleep 10 # sleep for 10 seconds to allow the server to start
           response=$(curl -s -o /dev/null -w "%{http_code}" localhost:3000/timer)
-          if [ "$response" -ne 401 ]; then
-              echo "Expected UNAUTHORIZED error, but got $response"
+          if [ "$response" -ne 303 ]; then
+              echo "Expected SEE OTHER (REDIRECT) error, but got $response"
               exit 1
           fi
 
