@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
 
       - name: "Install Nix"
-        uses: DeterminateSystems/nix-installer-action@21a544727d0c62386e78b4befe52d19ad12692e3 # v17
+        uses: DeterminateSystems/nix-installer-action@90bb610b90bf290cad97484ba341453bd1cbefea # v19
 
       - name: "Nix Cache"
         uses: DeterminateSystems/flakehub-cache-action@134cf641155463d87d343c6cb2b7970089967b99 # v2
