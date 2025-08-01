@@ -35,8 +35,6 @@ jobs:
           - os: ubuntu-latest
             os-name: "Linux x86"
           - os: macos-latest
-            os-name: "macOS x86"
-          - os: macos-14
             os-name: "macOS Apple Silicon"
     steps:
       - name: "Checkout Repo"
