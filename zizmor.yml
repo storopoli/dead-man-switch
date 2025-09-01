@@ -1,6 +1,6 @@
 rules:
   use-trusted-publishing:
     ignore:
-      - release.yml:40
-      - release.yml:45
-      - release.yml:50
+      - release.yml:38
+      - release.yml:43
+      - release.yml:48
