@@ -308,4 +308,11 @@ mod test {
             let _ = fs::remove_dir_all(parent);
         }
     }
+
+    #[test]
+    fn example_config_is_valid() {
+        let example_config = fs::read_to_string("../../config.example.toml").unwrap();
+        let config: Result<Config, toml::de::Error> = toml::from_str(&example_config);
+        assert!(config.is_ok());
+    }
 }
