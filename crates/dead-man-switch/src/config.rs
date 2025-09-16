@@ -265,7 +265,7 @@ mod test {
     }
 
     #[test]
-    fn test_save_config() {
+    fn save_config() {
         let test_dir = get_isolated_test_dir();
         let test_path = test_dir.join("config.toml");
         let config = Config::default();
@@ -281,7 +281,7 @@ mod test {
     }
 
     #[test]
-    fn test_load_or_initialize_config_with_existing_file() {
+    fn load_or_initialize_config_with_existing_file() {
         let test_dir = get_isolated_test_dir();
         let test_path = test_dir.join("config.toml");
         let config = Config::default();
@@ -298,7 +298,7 @@ mod test {
     }
 
     #[test]
-    fn test_config_path_in_test_mode() {
+    fn config_path_in_test_mode() {
         // This test verifies that config_path() uses temp directory in test mode
         let path = config_path().unwrap();
         assert!(path.to_string_lossy().contains("deadman_test"));
