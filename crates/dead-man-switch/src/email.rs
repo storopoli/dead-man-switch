@@ -176,6 +176,7 @@ mod tests {
             timer_dead_man: 120,
             web_password: "password".to_string(),
             cookie_exp_days: 7,
+            log_level: None,
         }
     }
 

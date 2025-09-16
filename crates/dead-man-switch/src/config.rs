@@ -54,6 +54,8 @@ pub struct Config {
     pub web_password: String,
     /// Cookie expiration to avoid need for login
     pub cookie_exp_days: u64,
+    /// Log level for the web interface.
+    pub log_level: Option<String>,
 }
 
 impl Default for Config {
@@ -77,6 +79,7 @@ impl Default for Config {
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
             web_password,
             cookie_exp_days: 7,
+            log_level: None,
         }
     }
 }
