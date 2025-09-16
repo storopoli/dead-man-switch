@@ -434,15 +434,19 @@ async fn timer_data(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Set up logging
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
-        .finish();
-    subscriber::set_global_default(subscriber)
-        .map_err(|e| anyhow::anyhow!("Setting default subscriber failed: {}", e))?;
-
     // Instantiate the Config
     let config = load_or_initialize_config().context("Failed to load or initialize config")?;
+
+    // Set up logging
+    let log_level = config
+        .log_level
+        .as_deref()
+        .unwrap_or("info")
+        .parse::<Level>()
+        .unwrap_or(Level::INFO);
+    let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
+    subscriber::set_global_default(subscriber)
+        .map_err(|e| anyhow::anyhow!("Setting default subscriber failed: {}", e))?;
 
     // Hash the password
     let password = config.web_password.clone();

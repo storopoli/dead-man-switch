@@ -54,6 +54,8 @@ pub struct Config {
     pub web_password: String,
     /// Cookie expiration to avoid need for login
     pub cookie_exp_days: u64,
+    /// Log level for the web interface.
+    pub log_level: Option<String>,
 }
 
 impl Default for Config {
@@ -77,6 +79,7 @@ impl Default for Config {
             timer_dead_man: 60 * 60 * 24 * 7, // 1 week
             web_password,
             cookie_exp_days: 7,
+            log_level: None,
         }
     }
 }
@@ -262,7 +265,7 @@ mod test {
     }
 
     #[test]
-    fn test_save_config() {
+    fn save_config() {
         let test_dir = get_isolated_test_dir();
         let test_path = test_dir.join("config.toml");
         let config = Config::default();
@@ -278,7 +281,7 @@ mod test {
     }
 
     #[test]
-    fn test_load_or_initialize_config_with_existing_file() {
+    fn load_or_initialize_config_with_existing_file() {
         let test_dir = get_isolated_test_dir();
         let test_path = test_dir.join("config.toml");
         let config = Config::default();
@@ -295,7 +298,7 @@ mod test {
     }
 
     #[test]
-    fn test_config_path_in_test_mode() {
+    fn config_path_in_test_mode() {
         // This test verifies that config_path() uses temp directory in test mode
         let path = config_path().unwrap();
         assert!(path.to_string_lossy().contains("deadman_test"));
@@ -304,5 +307,12 @@ mod test {
         if let Some(parent) = path.parent() {
             let _ = fs::remove_dir_all(parent);
         }
+    }
+
+    #[test]
+    fn example_config_is_valid() {
+        let example_config = fs::read_to_string("../../config.example.toml").unwrap();
+        let config: Result<Config, toml::de::Error> = toml::from_str(&example_config);
+        assert!(config.is_ok());
     }
 }
