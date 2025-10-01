@@ -19,7 +19,7 @@ readme = "README.md"
 dead-man-switch = { path = "crates/dead-man-switch", version = "0.7.3" }
 
 chrono = "0.4.41"
-zeroize = { version = "1.8.1", features = ["derive"] }
+zeroize = { version = "1.8.2", features = ["derive"] }
 
 [profile.release]
 opt-level = "z"   # Optimized for size, use 3 for speed
