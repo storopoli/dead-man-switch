@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
 
       - name: Upload binary to release
-        uses: ncipollo/release-action@1c89adf39833729d8f85a31ccbc451b078733c80 # v1
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1
 
   cratesio:
     name: Publish Release to Crates.io
