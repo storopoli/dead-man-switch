@@ -1,0 +1,45 @@
+# Dockerfile to build the CLI image
+
+# ---------- builder: use Debian bookworm and install rustup ----------
+FROM debian:bookworm AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /usr/src/app
+
+# Minimal build deps (install only what's necessary)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates curl git pkg-config libssl-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install rustup & set PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy source (adjust to your repo layout)
+COPY . .
+
+# Build release binaries (adjust package names as needed)
+RUN . /root/.cargo/env \
+    && cargo build --release -p dead-man-switch-tui
+
+# ---------- runtime: slim bookworm ----------
+FROM debian:bookworm-slim AS runtime
+WORKDIR /usr/src/app
+
+# Install only runtime library needed (libssl3 if your binary needs it)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libssl3 \
+  && rm -rf /var/lib/apt/lists/*
+
+# Copy binaries from builder
+COPY --from=builder /usr/src/app/target/release/dead-man-switch-tui /usr/local/bin/dead-man-switch-tui
+
+# create non-root user
+RUN useradd -r -u 1000 -m -d /home/dms dms \ 
+ && chown -R dms:dms /usr/local/bin/dead-man-switch-tui /home/dms 
+ENV HOME=/home/dms
+USER 1000
+
+# Create config directory
+RUN mkdir -p /home/dms/.config/deadman
+
+CMD ["/usr/local/bin/dead-man-switch-tui"]
