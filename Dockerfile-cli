@@ -1,34 +1,29 @@
-# Dockerfile to build the CLI image
+# Start from the official Rust image
+FROM rust:latest AS builder
 
-# ---------- builder: use Debian bookworm and install rustup ----------
-FROM debian:bookworm AS builder
-ENV DEBIAN_FRONTEND=noninteractive
+# Set the working directory
 WORKDIR /usr/src/app
 
-# Minimal build deps (install only what's necessary)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential ca-certificates curl git pkg-config libssl-dev \
-  && rm -rf /var/lib/apt/lists/*
+# Add labels for OCI annotations
+LABEL org.opencontainers.image.source="https://github.com/storopoli/dead-man-switch" \
+    org.opencontainers.image.description="Dead Man's Switch" \
+    org.opencontainers.image.licenses="AGPLv3"
 
-# Install rustup & set PATH
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+# Copy project's source
+COPY ./Cargo.toml ./
+COPY ./Cargo.lock ./
+COPY ./crates ./crates
 
-# Copy source (adjust to your repo layout)
-COPY . .
+# Build application for release target
+RUN cargo build -p dead-man-switch-cli --release
 
-# Build release binaries (adjust package names as needed)
-RUN . /root/.cargo/env \
-    && cargo build --release -p dead-man-switch-tui
+# Start a new stage from a slim version of Debian to reduce the size of the final image
+FROM debian:bookworm-slim
 
-# ---------- runtime: slim bookworm ----------
-FROM debian:bookworm-slim AS runtime
 WORKDIR /usr/src/app
 
-# Install only runtime library needed (libssl3 if your binary needs it)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3 \
-  && rm -rf /var/lib/apt/lists/*
+# Install libssl3
+RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib/apt/lists/*
 
 # Copy binaries from builder
 COPY --from=builder /usr/src/app/target/release/dead-man-switch-tui /usr/local/bin/dead-man-switch-tui
