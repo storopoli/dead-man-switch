@@ -13,13 +13,13 @@ on:
     tags:
       - v*
 env:
-  IMAGE_NAME: dead_man_switch
+  IMAGE_NAME_WEB: dead_man_switch-web
+  IMAGE_NAME_CLI: dead_man_switch-cli
 
 permissions: {}
 
 jobs:
-  # This publishes the image to GitHub Packages.
-  publish:
+  publish-web:
     runs-on: ubuntu-latest
 
     permissions:
@@ -32,7 +32,49 @@ jobs:
           persist-credentials: false
 
       - name: Build image
-        run: docker build . --file Dockerfile --tag $IMAGE_NAME --label "runnumber=${GITHUB_RUN_ID}"
+        run: docker build . --file Dockerfile-web --tag $IMAGE_NAME_WEB --label "runnumber=${GITHUB_RUN_ID}"
+
+      - name: Log in to registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Push image
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          IMAGE_ID=ghcr.io/$REPO_OWNER/$IMAGE_NAME
+
+          # This changes all uppercase characters to lowercase.
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+          # This strips the git ref prefix from the version.
+          VERSION=$(echo "$GITHUB_REF" | sed -e 's,.*/\(.*\),\1,')
+
+          # This strips the "v" prefix from the tag name.
+          [[ "$GITHUB_REF" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+
+          # This uses the Docker `latest` tag convention.
+          [ "$VERSION" == "main" ] && VERSION=latest
+
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
+
+  publish-cli:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build . --file Dockerfile-cli --tag $IMAGE_NAME_CLI --label "runnumber=${GITHUB_RUN_ID}"
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
