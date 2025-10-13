@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 jobs:
-  build:
+  build-web:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,10 +20,10 @@ jobs:
           persist-credentials: false
 
       - name: Build Docker image
-        run: docker build -t dead_man_switch .
+        run: docker build -t dead_man_switch-web Dockerfile-web
 
       - name: Run Docker
-        run: docker run -d --name dead_man_switch -p 3000:3000 dead_man_switch
+        run: docker run -d --name dead_man_switch-web -p 3000:3000 dead_man_switch-web
 
       - name: Test Docker
         run: |
@@ -35,4 +35,22 @@ jobs:
           fi
 
       - name: Display Docker container logs
-        run: docker logs dead_man_switch
+        run: docker logs dead_man_switch-web
+
+  build-cli:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build Docker image
+        run: docker build -t dead_man_switch-cli Dockerfile-cli
+
+      - name: Run Docker
+        run: docker run -d --name dead_man_switch-cli dead_man_switch-cli
+
+      - name: Display Docker container logs
+        run: docker logs dead_man_switch-cli
