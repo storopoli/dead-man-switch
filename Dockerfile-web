@@ -23,7 +23,6 @@ FROM debian:bookworm-slim
 # Install libssl3
 RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib/apt/lists/*
 
-
 WORKDIR /usr/src/app
 
 # Copy the binary from the builder stage to the new stage
