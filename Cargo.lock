@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch"
-version = "0.7.3"
+version = "0.8.0"
 dependencies = [
  "chrono",
  "directories-next",
@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch-tui"
-version = "0.7.3"
+version = "0.8.0"
 dependencies = [
  "crossterm 0.29.0",
  "dead-man-switch",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch-web"
-version = "0.7.3"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "askama",
