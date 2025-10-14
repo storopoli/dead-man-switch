@@ -1,104 +1,73 @@
-name: Build and Deploy Docker to GHCR
+name: Publish image
 
-# This workflow runs when any of the following occur:
-# - A push is made to a branch called `main`
-# - A tag starting with "v" is created
 on:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - "**.md"
-      - "**.txt"
     tags:
-      - v*
+      - 'v*'
+    branches:
+      - 'main'
+
+permissions:
+  contents: read
+  packages: write
+
 env:
-  IMAGE_NAME_WEB: dead_man_switch-web
-  IMAGE_NAME_CLI: dead_man_switch-cli
-
-permissions: {}
-
+  IMAGE_NAME: dead_man_switch  
+  
 jobs:
-  publish-web:
+  publish:
     runs-on: ubuntu-latest
 
-    permissions:
-      packages: write
-      contents: read
-
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Build image
-        run: docker build . --file Dockerfile-web --tag $IMAGE_NAME_WEB --label "runnumber=${GITHUB_RUN_ID}"
+      - name: Set up QEMU (for multi-arch builds, optional)
+        uses: docker/setup-qemu-action@v2
 
-      - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Push image
-        env:
-          REPO_OWNER: ${{ github.repository_owner }}
-          GITHUB_REF: ${{ github.ref }}
+      - name: Compute image name & version
+        id: meta
         run: |
-          IMAGE_ID=ghcr.io/$REPO_OWNER/$IMAGE_NAME_WEB
+          REPO_OWNER="${{ github.repository_owner }}"
+          IMAGE_ID="ghcr.io/${REPO_OWNER}/${IMAGE_NAME}"
+          IMAGE_ID=$(echo "$IMAGE_ID" | tr '[:upper:]' '[:lower:]')
+          # derive version from ref
+          REF="${GITHUB_REF}"
+          VERSION="${REF##*/}"   # branch or tag name
+          if [[ "$REF" == refs/tags/* ]]; then
+            VERSION="${VERSION#v}"   # strip leading v if tag
+          fi
+          if [[ "$VERSION" == "main" ]]; then
+            VERSION="latest"
+          fi
+          echo "IMAGE_ID=${IMAGE_ID}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "::notice ::IMAGE_ID=${IMAGE_ID} VERSION=${VERSION}"
 
-          # This changes all uppercase characters to lowercase.
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-
-          # This strips the git ref prefix from the version.
-          VERSION=$(echo "$GITHUB_REF" | sed -e 's,.*/\(.*\),\1,')
-
-          # This strips the "v" prefix from the tag name.
-          [[ "$GITHUB_REF" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-
-          # This uses the Docker `latest` tag convention.
-          [ "$VERSION" == "main" ] && VERSION=latest
-
-          echo IMAGE_ID=$IMAGE_ID
-          echo VERSION=$VERSION
-          docker tag $IMAGE_NAME_WEB $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
-
-  publish-cli:
-    runs-on: ubuntu-latest
-
-    permissions:
-      packages: write
-      contents: read
-
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
         with:
-          persist-credentials: false
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image
-        run: docker build . --file Dockerfile-cli --tag $IMAGE_NAME_CLI --label "runnumber=${GITHUB_RUN_ID}"
+      - name: Build and push (buildx) from Dockerfile-cli
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile-cli
+          push: true
+          tags: ${{ env.IMAGE_ID }}:${{ env.VERSION }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp || github.run_started_at }}
+            runnumber=${{ github.run_id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Log in to registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-
-      - name: Push image
-        env:
-          REPO_OWNER: ${{ github.repository_owner }}
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          IMAGE_ID=ghcr.io/$REPO_OWNER/$IMAGE_NAME_CLI
-
-          # This changes all uppercase characters to lowercase.
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-
-          # This strips the git ref prefix from the version.
-          VERSION=$(echo "$GITHUB_REF" | sed -e 's,.*/\(.*\),\1,')
-
-          # This strips the "v" prefix from the tag name.
-          [[ "$GITHUB_REF" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-
-          # This uses the Docker `latest` tag convention.
-          [ "$VERSION" == "main" ] && VERSION=latest
-
-          echo IMAGE_ID=$IMAGE_ID
-          echo VERSION=$VERSION
-          docker tag $IMAGE_NAME_CLI $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
