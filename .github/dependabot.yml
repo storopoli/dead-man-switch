@@ -4,11 +4,20 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    # Cooldown
+    cooldown:
+      default-days: 5
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "monthly"
+    # Cooldown
+    cooldown:
+      default-days: 5
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
       interval: monthly
+    # Cooldown
+    cooldown:
+      default-days: 5
