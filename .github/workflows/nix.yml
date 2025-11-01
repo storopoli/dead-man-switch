@@ -46,7 +46,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@786fff0690178f1234e4e1fe9b536e94f5433196 # v20
 
       - name: "Nix Cache"
-        uses: DeterminateSystems/flakehub-cache-action@134cf641155463d87d343c6cb2b7970089967b99 # v2
+        uses: DeterminateSystems/flakehub-cache-action@f7831e2a80f884ef16bbbd09a60823b4cf191069 # v2
 
       - name: "Test Nix Package"
         run: nix build -L .
