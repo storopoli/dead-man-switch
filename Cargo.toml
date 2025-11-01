@@ -18,7 +18,7 @@ readme = "README.md"
 [workspace.dependencies]
 dead-man-switch = { path = "crates/dead-man-switch", version = "0.8.0" }
 
-chrono = "0.4.41"
+chrono = "0.4.42"
 zeroize = { version = "1.8.2", features = ["derive"] }
 
 [profile.release]
