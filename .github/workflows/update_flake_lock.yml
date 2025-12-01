@@ -22,7 +22,7 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@786fff0690178f1234e4e1fe9b536e94f5433196 # v20
 
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@c5930b397a673a70ca70be06020e943aeac310a1 # v27
+        uses: DeterminateSystems/update-flake-lock@834c491b2ece4de0bbd00d85214bb5e83b4da5c6 # v28
         with:
           pr-title: "fix: update flake.lock" # Title of PR to be created
           pr-labels: | # Labels to be set on the PR
