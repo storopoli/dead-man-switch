@@ -6,18 +6,18 @@ updates:
       interval: "monthly"
     # Cooldown
     cooldown:
-      default-days: 5
+      default-days: 7
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "monthly"
     # Cooldown
     cooldown:
-      default-days: 5
+      default-days: 7
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
       interval: monthly
     # Cooldown
     cooldown:
-      default-days: 5
+      default-days: 7
