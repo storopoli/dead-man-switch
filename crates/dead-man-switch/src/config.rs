@@ -10,6 +10,7 @@ use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
+use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Configuration struct used for the application
@@ -60,9 +61,13 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        // Use the WEB_PASSWORD environment variable if set, otherwise generate
+        // a cryptographically secure random password. This prevents the security
+        // vulnerability of having a hardcoded default password that attackers
+        // could exploit.
         let web_password = env::var("WEB_PASSWORD")
             .ok()
-            .unwrap_or("password".to_string());
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
         Self {
             username: "me@example.com".to_string(),
             password: "".to_string(),
@@ -273,8 +278,10 @@ mod test {
         // Test saving and loading with our isolated functions
         save_config_with_path(&config, &test_path).unwrap();
 
+        // Compare against the same config instance that was saved,
+        // not a new default (which would have a different random password)
         let loaded_config = load_config_from_path(&test_path).unwrap();
-        assert_eq!(loaded_config, Config::default());
+        assert_eq!(loaded_config, config);
 
         // Cleanup - remove the entire test directory
         let _ = fs::remove_dir_all(&test_dir);
@@ -289,9 +296,10 @@ mod test {
         // Save config first
         save_config_with_path(&config, &test_path).unwrap();
 
-        // Load it back
+        // Compare against the same config instance that was saved,
+        // not a new default (which would have a different random password)
         let loaded_config = load_config_from_path(&test_path).unwrap();
-        assert_eq!(loaded_config, Config::default());
+        assert_eq!(loaded_config, config);
 
         // Cleanup - remove the entire test directory
         let _ = fs::remove_dir_all(&test_dir);
