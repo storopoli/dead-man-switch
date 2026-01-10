@@ -174,7 +174,7 @@ impl FromRef<SharedState> for Key {
 struct TimerData {
     timer_type: String,
     time_left_percentage: u16,
-    label: String,
+    time_left_seconds: i64,
 }
 
 #[derive(Template)]
@@ -188,7 +188,7 @@ struct LoginTemplate {
 struct DashboardTemplate {
     timer_type: String,
     time_left_percentage: u16,
-    label: String,
+    time_left_seconds: i64,
 }
 
 /// Create a secure cookie with proper security flags
@@ -306,11 +306,11 @@ async fn show_login(
             TimerType::DeadMan => "Dead Man".to_string(),
         };
         let time_left_percentage = timer.remaining_percent();
-        let label = timer.label();
+        let time_left_seconds = timer.remaining_chrono().num_seconds();
         let dashboard_template = DashboardTemplate {
             timer_type,
             time_left_percentage,
-            label,
+            time_left_seconds,
         };
         return match dashboard_template.render() {
             Ok(html) => Html(html),
@@ -388,11 +388,11 @@ async fn show_dashboard(
         TimerType::DeadMan => "Dead Man".to_string(),
     };
     let time_left_percentage = timer.remaining_percent();
-    let label = timer.label();
+    let time_left_seconds = timer.remaining_chrono().num_seconds();
     let dashboard_template = DashboardTemplate {
         timer_type,
         time_left_percentage,
-        label,
+        time_left_seconds,
     };
 
     match dashboard_template.render() {
@@ -421,12 +421,12 @@ async fn timer_data(
     let timer = state.app_state.timer.lock().await;
     let timer_type = format!("{:?}", timer.get_type());
     let time_left_percentage = timer.remaining_percent();
-    let label = timer.label();
+    let time_left_seconds = timer.remaining_chrono().num_seconds();
 
     let data = TimerData {
         timer_type,
-        label,
         time_left_percentage,
+        time_left_seconds,
     };
 
     Json(data)

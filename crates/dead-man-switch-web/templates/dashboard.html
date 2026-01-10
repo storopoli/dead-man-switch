@@ -1,73 +1,250 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Dead Man's Switch - Dashboard</title>
-         <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                padding: 20px;
-                margin: 0;
-            }
-            h1 {
-                font-size: 24px;
-                margin-bottom: 20px;
-                text-align: center;
-            }
-            p {
-                font-size: 18px;
-                text-align: center;
-                margin: 5px 0;
-            }
-            form {
-                display: flex;
-                justify-content: center;
-                margin-top: 20px;
-            }
-            button {
-                background-color: #007BFF;
-                color: white;
-                padding: 10px 15px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 16px;
-                margin: 5px;
-            }
-            button:hover {
-                background-color: #0056b3;
-            }
-        </style>
-        <script>
-            // Function to fetch timer data every second and update the DOM
-            function updateDashboard() {
-                fetch('/timer')  // Fetch data from the server
-                    .then(response => response.json())
-                    .then(data => {
-                        // Update the timer details in the page
-                        document.getElementById('timer_type').innerText = data.timer_type;
-                        document.getElementById('label').innerText = data.label;
-                        document.getElementById('time_left_percentage').innerText = data.time_left_percentage;
-                    })
-                    .catch(error => console.error('Error fetching timer data:', error));
-            }
 
-            // Set interval to update the dashboard every second
-            setInterval(updateDashboard, 1000);
-        </script>
-    </head>
-    <body onload="updateDashboard()">
-        <h1>Dashboard</h1>
-        <p>Timer: <span id="timer_type">{{ timer_type }}</span></p>
-        <p>Time left: <span id="label">{{ label }}</span></p>
-        <p>Percentage: <span id="time_left_percentage">{{ time_left_percentage }}</span></p>
-        <!-- Check-in button -->
-        <form action="/dashboard" method="post">
-            <button type="submit">Check-In</button>
-        </form>
-        <!-- Logout button -->
-        <form action="/logout" method="post">
-            <button type="submit">Logout</button>
-        </form>
-    </body>
+<head>
+    <title>Dead Man's Switch - Dashboard</title>
+    <style>
+        :root {
+            --page-bg: #f4f4f4;
+            --page-text: #202020;
+            --button-text: #ffffff;
+            --primary: #0d6efd;
+            --primary-hover: #0a58ca;
+            --timer-block-bg: #202020;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --page-bg: #202020;
+                --page-text: #f4f4f4;
+                --timer-block-bg: #f4f4f4;
+            }
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--page-bg);
+            color: var(--page-text);
+            padding: 20px;
+            margin: 0;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        p {
+            margin: 5px 0;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            justify-content: center;
+            margin: 10px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: var(--button-text);
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            min-width: 120px;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .timer-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            color: var(--page-bg);
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .time-block {
+            background-color: var(--timer-block-bg);
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            width: 66px;
+            flex: 1 1 auto;
+        }
+
+        @media (max-width: 420px) {
+            .time-block {
+                width: 34%;
+            }
+        }
+
+        .label {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: var(--page-bg);
+        }
+
+        .number {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .progress-container {
+            margin: 10px 0;
+        }
+
+        .progress-label {
+            margin: 15px 0 5px 0;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 28px;
+            border-radius: 4px;
+            overflow: hidden;
+            width: 100%;
+            background-color: var(--page-bg);
+            transition: width 0.6s, background-color 0.6s;
+        }
+
+        .progress-fill {
+            height: 100%;
+            transition: width 0.6s, background-color 0.6s;
+            background-color: var(--page-bg);
+        }
+    </style>
+</head>
+
+<body onload="updateDashboard()">
+    <h1>Dashboard</h1>
+    <p>Timer State:
+        <span id="timer-type">{{ timer_type }}</span>
+    </p>
+    <div>
+        <div class="timer-container">
+
+            <div class="time-block">
+                <div class="label">Days</div>
+                <div class="number" id="days">
+                    --
+                </div>
+            </div>
+            <div class="time-block">
+                <div class="label">Hours</div>
+                <div class="number" id="hours">
+                    --
+                </div>
+            </div>
+            <div class="time-block">
+                <div class="label">Minutes</div>
+                <div class="number" id="minutes">
+                    --
+                </div>
+            </div>
+            <div class="time-block">
+                <div class="label">Seconds</div>
+                <div class="number" id="seconds">
+                    --
+                    <!-- will render {{ time_left_seconds }} to these time-blocks -->
+                </div>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <div class="progress-label">Percentage:
+                <span id="time-left-percentage">
+                    <!-- will render {{ time_left_percentage }} in this element -->
+                    Loading...
+                </span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Check-in button -->
+    <form action="/dashboard" method="post">
+        <button type="submit">Check-In</button>
+    </form>
+
+    <!-- Logout button -->
+    <form action="/logout" method="post">
+        <button type="submit">Logout</button>
+    </form>
+
+    <script>
+        // Cache DOM elements
+        const daysElement = document.getElementById('days')
+        const hoursElement = document.getElementById('hours')
+        const minutesElement = document.getElementById('minutes')
+        const secondsElement = document.getElementById('seconds')
+        const progressFillElement = document.getElementById('progress-fill')
+        const progressBarElement = document.querySelector('.progress-bar')
+        const timerTypeElement = document.getElementById('timer-type')
+        const timeLeftPercentageElement = document.getElementById('time-left-percentage')
+
+        // Function to fetch timer data every second and update the DOM
+        function updateDashboard() {
+            fetch('/timer') // Fetch data from the server
+                .then(response => response.json())
+                .then(data => {
+                    // Parse time_left_seconds
+                    const totalSeconds = data.time_left_seconds
+                    const days = Math.floor(totalSeconds / (3600 * 24))
+                    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600)
+                    const minutes = Math.floor((totalSeconds % 3600) / 60)
+                    const seconds = totalSeconds % 60
+
+                    // Parse percentage and progress bar requirements
+                    const percentage = data.time_left_percentage
+                    let bgColor, fillColor
+                    if (percentage > 20) {
+                        bgColor = '#d4f3dc'
+                        fillColor = '#1e7e34'
+                    } else if (percentage > 10) {
+                        bgColor = '#ffebbb'
+                        fillColor = '#b38600'
+                    } else {
+                        bgColor = '#f6d6d8'
+                        fillColor = '#a71d2a'
+                    }
+
+                    // Update the type
+                    timerTypeElement.innerText = data.timer_type
+
+                    // Update the clock
+                    daysElement.innerText = days
+                    hoursElement.innerText = hours
+                    minutesElement.innerText = minutes
+                    secondsElement.innerText = seconds
+
+                    // Update the progress
+                    progressBarElement.style.backgroundColor = bgColor
+                    progressFillElement.style.backgroundColor = fillColor
+                    progressFillElement.style.width = `${percentage}%`
+                    timeLeftPercentageElement.innerText = `${percentage}%`
+                })
+                .catch(error => console.error('Error fetching timer data:', error))
+        }
+
+        // Set interval to update the dashboard every second
+        setInterval(updateDashboard, 1000);
+    </script>
+</body>
+
 </html>
