@@ -9,9 +9,8 @@
 //! 1. The [`TimerType::DeadMan`] timer that will trigger the message and optional
 //!    attachment to the user's configured `To` email address upon expiration.
 
-use std::time::{Duration, Instant};
-
 use chrono::Duration as ChronoDuration;
+use std::time::{Duration, Instant};
 
 /// The timer enum.
 ///

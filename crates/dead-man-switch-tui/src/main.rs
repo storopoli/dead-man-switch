@@ -1,8 +1,5 @@
 //! TUI implementation for the Dead Man's Switch.
 
-use std::io;
-use std::time::Duration;
-
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -16,11 +13,12 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
-use thiserror::Error;
+use std::io;
+use std::time::Duration;
 
 use dead_man_switch::{
-    config::{config_path, load_or_initialize_config, ConfigError, Email},
-    email::EmailError,
+    config::{config_path, load_or_initialize_config, Email},
+    error::TuiError,
     timer::{Timer, TimerType},
 };
 
@@ -264,20 +262,6 @@ fn timer_block(
         .gauge_style(gauge_style)
         .label(Span::styled(label, label_style))
         .block(Block::default().title(title).borders(Borders::ALL))
-}
-
-/// TUI Error type.
-#[derive(Error, Debug)]
-enum TuiError {
-    /// IO Error.
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    /// [`ConfigError`] blanket error conversion.
-    #[error(transparent)]
-    Config(#[from] ConfigError),
-    /// [`EmailError`] blanket error conversion.
-    #[error(transparent)]
-    Email(#[from] EmailError),
 }
 
 /// Run the TUI.

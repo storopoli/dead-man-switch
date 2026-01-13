@@ -1,15 +1,13 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
-use std::env;
-
-use std::fs::{self, File};
-use std::io::{self, Write};
-use std::path::PathBuf;
+use crate::error::ConfigError;
 
 use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
+use std::env;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::PathBuf;
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -87,26 +85,6 @@ impl Default for Config {
             log_level: None,
         }
     }
-}
-
-/// Configuration errors
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    /// IO operations on config module.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-
-    /// TOML serialization.
-    #[error(transparent)]
-    TomlSerialization(#[from] SerTomlError),
-
-    /// TOML deserialization.
-    #[error(transparent)]
-    TomlDeserialization(#[from] DerTomlError),
-
-    /// Attachment not found.
-    #[error("Attachment not found")]
-    AttachmentNotFound,
 }
 
 /// Enum to represent the type of email to send.

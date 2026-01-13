@@ -1,7 +1,5 @@
 //! Web implementation for the Dead Man's Switch.
 
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
-
 use anyhow::Context;
 use askama::Template;
 use axum::{
@@ -23,6 +21,7 @@ use jsonwebtoken::{
     decode, encode, errors::Error as JsonTokenError, DecodingKey, EncodingKey, Header, Validation,
 };
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, time::sleep};
 use tokio::{
     runtime::Handle,

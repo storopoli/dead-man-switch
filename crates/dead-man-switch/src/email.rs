@@ -1,53 +1,18 @@
 //! Email sending capabilities of the Dead Man's Switch.
 
-use std::fs;
-use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use crate::config::{attachment_path, Config, Email};
+use crate::error::{AddressError, EmailError};
 
 use lettre::{
-    address::AddressError,
-    error::Error as LettreError,
-    message::{
-        header::{ContentType, ContentTypeErr},
-        Attachment, Mailbox, MultiPart, SinglePart,
-    },
+    message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart},
     transport::smtp::{
-        self,
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
     Message, SmtpTransport, Transport,
 };
-use thiserror::Error;
-
-use crate::config::{attachment_path, Config, ConfigError, Email};
-
-/// Errors that can occur when sending an email.
-#[derive(Error, Debug)]
-pub enum EmailError {
-    /// TLS error when sending the email.
-    #[error(transparent)]
-    TlsError(#[from] smtp::Error),
-
-    /// Error when parsing email addresses.
-    #[error(transparent)]
-    EmailError(#[from] AddressError),
-
-    /// Error when building the email.
-    #[error(transparent)]
-    BuilderError(#[from] LettreError),
-
-    /// Error when reading the attachment.
-    #[error(transparent)]
-    IoError(#[from] IoError),
-
-    /// Error when determining the content type of the attachment.
-    #[error(transparent)]
-    InvalidContent(#[from] ContentTypeErr),
-
-    /// Error when determining the content type of the attachment.
-    #[error(transparent)]
-    AttachmentPath(#[from] ConfigError),
-}
+use std::fs;
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 
 impl Config {
     /// Send the email using the provided configuration.
