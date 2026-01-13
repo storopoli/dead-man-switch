@@ -43,6 +43,34 @@ pub enum ConfigError {
     ConfigFile(#[from] HomeDirError),
 }
 
+// Timer errors
+#[derive(Error, Debug)]
+pub enum TimerError {
+    /// IO operations on timer module.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// TOML serialization.
+    #[error(transparent)]
+    TomlSerialization(#[from] SerTomlError),
+
+    /// TOML deserialization.
+    #[error(transparent)]
+    TomlDeserialization(#[from] DerTomlError),
+
+    /// Config error
+    #[error(transparent)]
+    Config(#[from] ConfigError),
+
+    /// Config directory errors.
+    #[error(transparent)]
+    ConfigFile(#[from] HomeDirError),
+
+    /// SystemTime error
+    #[error("System time too old")]
+    SystemTime,
+}
+
 /// Errors that can occur when sending an email.
 #[derive(Error, Debug)]
 pub enum EmailError {
@@ -85,4 +113,8 @@ pub enum TuiError {
     /// [`EmailError`] blanket error conversion.
     #[error(transparent)]
     Email(#[from] EmailError),
+
+    /// [`TimerError`] blanket error conversion.
+    #[error(transparent)]
+    Timer(#[from] TimerError),
 }

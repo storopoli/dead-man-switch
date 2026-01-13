@@ -267,7 +267,7 @@ async fn require_auth(
 }
 
 /// Timer loop to check for expired timers and send emails
-async fn main_timer_loop(app_state: Arc<AppState>) {
+async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
     loop {
         let mut timer = app_state.timer.lock().await;
         let config = app_state.config.read().await;
@@ -283,12 +283,14 @@ async fn main_timer_loop(app_state: Arc<AppState>) {
                     if let Err(e) = config.send_email(Email::DeadMan) {
                         error!(?e, "failed to send dead man email");
                     }
-                    break;
+                    return Ok(());
                 }
             }
         }
         let elapsed = timer.elapsed();
-        timer.update(elapsed, config.timer_dead_man);
+        timer
+            .update(elapsed, config.timer_dead_man)
+            .context("Failed to update timer")?;
         sleep(Duration::from_secs(1)).await;
     }
 }
@@ -407,9 +409,15 @@ async fn handle_check_in(
 ) -> impl IntoResponse {
     let config = state.app_state.config.read().await;
     let mut timer = state.app_state.timer.lock().await;
-    timer.reset(&config);
-    info!("check-in using web interface");
-    Redirect::to("/dashboard")
+    if let Err(e) = timer.reset(&config) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error resetting timer: {}", e),
+        )
+            .into_response();
+    }
+    info!("User checked-in from web interface");
+    Redirect::to("/dashboard").into_response()
 }
 
 /// Endpoint to serve the current timer data in JSON
@@ -463,10 +471,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Create a new Timer
-    let timer = Timer::new(
-        TimerType::Warning,
-        Duration::from_secs(config.timer_warning),
-    );
+    let timer = Timer::new().map_err(|e| anyhow::anyhow!(e))?;
     let app_state = Arc::new(AppState {
         config: RwLock::new(config),
         timer: Mutex::new(timer),

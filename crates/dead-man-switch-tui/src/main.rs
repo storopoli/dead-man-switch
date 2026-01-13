@@ -283,10 +283,7 @@ fn run() -> Result<(), TuiError> {
     let config_path = config::file_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
-    let mut timer = TuiTimer::new(Timer::new(
-        TimerType::Warning,
-        Duration::from_secs(config.timer_warning),
-    ));
+    let mut timer = TuiTimer::new(Timer::new()?);
 
     // Main loop
     loop {
@@ -296,8 +293,8 @@ fn run() -> Result<(), TuiError> {
         if crossterm::event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,   // Quit
-                    KeyCode::Char('c') => timer.0.reset(&config), // Check-In
+                    KeyCode::Char('q') | KeyCode::Esc => break,    // Quit
+                    KeyCode::Char('c') => timer.0.reset(&config)?, // Check-In
                     _ => {}
                 }
             }
@@ -317,7 +314,7 @@ fn run() -> Result<(), TuiError> {
         }
 
         let elapsed = timer.0.elapsed();
-        timer.0.update(elapsed, config.timer_dead_man);
+        timer.0.update(elapsed, config.timer_dead_man)?;
     }
 
     // Restore terminal
