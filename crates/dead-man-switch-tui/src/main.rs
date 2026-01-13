@@ -17,7 +17,7 @@ use std::io;
 use std::time::Duration;
 
 use dead_man_switch::{
-    config::{config_path, load_or_initialize_config, Email},
+    config::{self, Email},
     error::TuiError,
     timer::{Timer, TimerType},
 };
@@ -277,10 +277,10 @@ fn run() -> Result<(), TuiError> {
     let mut terminal = Terminal::new(backend)?;
 
     // Instantiate the Config
-    let config = load_or_initialize_config()?;
+    let config = config::load_or_initialize()?;
 
     // Get config OS-agnostic path
-    let config_path = config_path()?.to_string_lossy().to_string();
+    let config_path = config::file_path()?.to_string_lossy().to_string();
 
     // Create a new Timer
     let mut timer = TuiTimer::new(Timer::new(

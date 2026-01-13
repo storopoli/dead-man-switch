@@ -14,7 +14,7 @@ use axum::{
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar, SameSite};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use dead_man_switch::{
-    config::{load_or_initialize_config, Config, Email},
+    config::{self, Config, Email},
     timer::{Timer, TimerType},
 };
 use jsonwebtoken::{
@@ -434,7 +434,7 @@ async fn timer_data(
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Instantiate the Config
-    let config = load_or_initialize_config().context("Failed to load or initialize config")?;
+    let config = config::load_or_initialize().context("Failed to load or initialize config")?;
 
     // Set up logging
     let log_level = config

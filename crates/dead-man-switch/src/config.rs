@@ -1,12 +1,12 @@
 //! Configuration module for the Dead Man's Switch
 //! Contains functions and structs to handle the configuration.
+use crate::app;
 use crate::error::ConfigError;
 
-use directories_next::BaseDirs;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -96,57 +96,32 @@ pub enum Email {
     DeadMan,
 }
 
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
-///
-/// # Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the config directory cannot be created
-///
-/// # Notes
-///
-/// This function handles testing and non-testing environments.
-pub fn config_path() -> Result<PathBuf, ConfigError> {
-    let base_dir = if cfg!(test) {
-        // Use a temporary directory for tests
-        std::env::temp_dir()
-    } else {
-        BaseDirs::new()
-            .ok_or_else(|| {
-                ConfigError::Io(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Failed to find home directory",
-                ))
-            })?
-            .config_dir()
-            .to_path_buf()
-    };
-
-    let config_dir = base_dir.join(if cfg!(test) {
-        "deadman_test"
-    } else {
-        "deadman"
-    });
-
-    fs::create_dir_all(&config_dir)?;
-    Ok(config_dir.join("config.toml"))
+/// Returns the name of the config file
+fn file_name() -> &'static str {
+    "config.toml"
 }
 
-/// Save the configuration to the OS-agnostic config directory.
+/// Get the configuration file path
 ///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
+/// # Errors
+///
+/// - Fails if the home directory cannot be found
+///
+pub fn file_path() -> Result<PathBuf, ConfigError> {
+    let path = app::file_path(file_name())?;
+    Ok(path)
+}
+
+/// Save the configuration file.
 ///
 /// # Errors
 ///
 /// - Fails if the home directory cannot be found
 /// - Fails if the config directory cannot be created
-pub fn save_config(config: &Config) -> Result<(), ConfigError> {
-    let config_path = config_path()?;
-    let mut file = File::create(config_path)?;
+///
+pub fn save(config: &Config) -> Result<(), ConfigError> {
+    let file_path = file_path()?;
+    let mut file = File::create(file_path)?;
     let config = toml::to_string(config)?;
 
     file.write_all(config.as_bytes())?;
@@ -154,10 +129,7 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
     Ok(())
 }
 
-/// Load the configuration from the OS-agnostic config directory.
-///
-/// Under the hood uses the [`directories_next`] crate to find the
-/// home directory and the config.
+/// Load or initialize the configuration file.
 ///
 /// # Errors
 ///
@@ -167,19 +139,20 @@ pub fn save_config(config: &Config) -> Result<(), ConfigError> {
 /// # Example
 ///
 /// ```rust
-/// use dead_man_switch::config::load_or_initialize_config;
-/// let config = load_or_initialize_config().unwrap();
+/// use dead_man_switch::config::load_or_initialize;
+/// let config = load_or_initialize().unwrap();
 /// ```
-pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
-    let config_path = config_path()?;
-    if !config_path.exists() {
+///
+pub fn load_or_initialize() -> Result<Config, ConfigError> {
+    let file_path = file_path()?;
+    if !file_path.exists() {
         let config = Config::default();
-        save_config(&config)?;
+        save(&config)?;
 
         Ok(config)
     } else {
-        let config = fs::read_to_string(&config_path)?;
-        let config: Config = toml::from_str(&config)?;
+        let config_str = fs::read_to_string(&file_path)?;
+        let config: Config = toml::from_str(&config_str)?;
 
         Ok(config)
     }
@@ -191,6 +164,7 @@ pub fn load_or_initialize_config() -> Result<Config, ConfigError> {
 ///
 /// - If the attachment path is not found.
 /// - If the attachment path is not a valid path.
+///
 pub fn attachment_path(config: &Config) -> Result<PathBuf, ConfigError> {
     let attachment_path = config
         .attachment
@@ -202,97 +176,146 @@ pub fn attachment_path(config: &Config) -> Result<PathBuf, ConfigError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{
-        env, file, process, thread,
-        time::{SystemTime, UNIX_EPOCH},
-    };
+    use std::path::Path;
 
-    /// Use a temporary directory approach that's more resilient.
-    fn get_isolated_test_dir() -> PathBuf {
-        let thread_id = format!("{:?}", thread::current().id());
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let pid = process::id();
+    struct TestGuard;
+    impl TestGuard {
+        fn new(c: &Config) -> Self {
+            // setup before test
 
-        let test_dir = env::temp_dir().join("deadman_test_isolated").join(format!(
-            "{}_{}_{}_{}",
-            file!().replace(['/', '\\'], "_"),
-            pid,
-            thread_id.replace([':', '(', ')'], "_"),
-            timestamp
-        ));
+            let file_path = file_path().expect("setup: failed file_path()");
 
-        fs::create_dir_all(&test_dir).expect("Failed to create test directory");
-        test_dir
-    }
+            // Ensure parent directory exists
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent).expect("setup: failed to create dir");
+            }
+            let mut file = File::create(file_path).expect("setup: failed to create file");
+            let c_str = toml::to_string(c).expect("setup: failed to convert data");
+            file.write_all(c_str.as_bytes())
+                .expect("setup: failed to write data");
+            file.sync_all()
+                .expect("setup: failed to ensure file written to disk");
 
-    /// Save the configuration to the given path.
-    fn save_config_with_path(config: &Config, path: &PathBuf) -> Result<(), ConfigError> {
-        // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            TestGuard
         }
-        let mut file = File::create(path)?;
-        let config_str = toml::to_string(config)?;
-        file.write_all(config_str.as_bytes())?;
-        file.sync_all()?; // Ensure data is written to disk
-        Ok(())
+    }
+    impl Drop for TestGuard {
+        fn drop(&mut self) {
+            // clean-up after a test
+            let file_path = file_path().expect("teardown: failed file_path()");
+            cleanup_test_dir_parent(file_path.as_path());
+        }
     }
 
-    fn load_config_from_path(path: &PathBuf) -> Result<Config, ConfigError> {
-        let config_str = fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&config_str)?;
-        Ok(config)
+    // helper
+    fn cleanup_test_dir(dir: &Path) {
+        if let Some(parent) = dir.parent() {
+            let _ = fs::remove_dir_all(parent);
+        }
+    }
+
+    // helper
+    fn cleanup_test_dir_parent(dir: &Path) {
+        if let Some(parent) = dir.parent() {
+            cleanup_test_dir(parent)
+        }
+    }
+
+    // helper
+    fn load_config_from_path(path: &PathBuf) -> Config {
+        let config_str = fs::read_to_string(path).expect("helper: error reading config data");
+        let config: Config =
+            toml::from_str(&config_str).expect("helper: error parsing config data");
+        config
+    }
+
+    #[test]
+    fn file_path_in_test_mode() {
+        // This test verifies that file_path() uses temp directory in test mode
+        let result = file_path();
+        assert!(result.is_ok());
+
+        let result = result.unwrap();
+        let expected = format!("{}_test", app::name());
+        assert!(result.to_string_lossy().contains(expected.as_str()));
+
+        // It should also of course contain the actual file name
+        let expected = Path::new(app::name()).join(file_name());
+        assert!(result
+            .to_string_lossy()
+            .contains(expected.to_string_lossy().as_ref()));
+
+        // Cleanup any created directories
+        cleanup_test_dir_parent(&result);
     }
 
     #[test]
     fn save_config() {
-        let test_dir = get_isolated_test_dir();
-        let test_path = test_dir.join("config.toml");
-        let config = Config::default();
+        // Set state for this test
+        let mut config = Config::default();
+        config.message = "test save".to_string();
 
-        // Test saving and loading with our isolated functions
-        save_config_with_path(&config, &test_path).unwrap();
+        let result = save(&config);
+        assert!(result.is_ok());
 
+        let test_path = file_path().unwrap();
         // Compare against the same config instance that was saved,
         // not a new default (which would have a different random password)
-        let loaded_config = load_config_from_path(&test_path).unwrap();
+        let loaded_config = load_config_from_path(&test_path);
+        // Compare against the original config instance
         assert_eq!(loaded_config, config);
-
-        // Cleanup - remove the entire test directory
-        let _ = fs::remove_dir_all(&test_dir);
-    }
-
-    #[test]
-    fn load_or_initialize_config_with_existing_file() {
-        let test_dir = get_isolated_test_dir();
-        let test_path = test_dir.join("config.toml");
-        let config = Config::default();
-
-        // Save config first
-        save_config_with_path(&config, &test_path).unwrap();
-
-        // Compare against the same config instance that was saved,
-        // not a new default (which would have a different random password)
-        let loaded_config = load_config_from_path(&test_path).unwrap();
-        assert_eq!(loaded_config, config);
-
-        // Cleanup - remove the entire test directory
-        let _ = fs::remove_dir_all(&test_dir);
-    }
-
-    #[test]
-    fn config_path_in_test_mode() {
-        // This test verifies that config_path() uses temp directory in test mode
-        let path = config_path().unwrap();
-        assert!(path.to_string_lossy().contains("deadman_test"));
 
         // Cleanup any created directories
-        if let Some(parent) = path.parent() {
-            let _ = fs::remove_dir_all(parent);
-        }
+        cleanup_test_dir_parent(&test_path);
+    }
+
+    #[test]
+    fn timer_guard_ok() {
+        // This test verifies that the guard is working as expected
+        // by saving a timer and reading it back
+
+        // Set state for this test
+        let mut config = Config::default();
+        config.message = "test guard".to_string();
+        let _guard = TestGuard::new(&config);
+
+        // Compare against the same config instance saved by guard
+        let test_path = file_path().unwrap();
+        let loaded_config = load_config_from_path(&test_path);
+        assert_eq!(loaded_config, config);
+    }
+
+    #[test]
+    fn load_or_initialize_with_existing_file() {
+        // Set state for this test
+        let mut existing_config = Config::default();
+        existing_config.message = "test load".to_string();
+        let _guard = TestGuard::new(&existing_config);
+
+        // With config data persisted, we should see a config with those values
+        let config = load_or_initialize().unwrap();
+
+        // Compare against the same config instance that was saved,
+        // not a new default (which would have a different random password)
+        assert_eq!(config, existing_config);
+    }
+
+    #[test]
+    fn load_or_initialize_with_no_existing_file() {
+        let mut config_default = Config::default();
+
+        // With no previous data persisted, we should see a config with defaults
+        let mut config = load_or_initialize().unwrap();
+
+        // deal with the the random web_password generation
+        config_default.web_password = "".to_string();
+        config.web_password = "".to_string();
+
+        assert_eq!(config, config_default);
+
+        // Cleanup any created directories
+        let test_path = file_path().unwrap();
+        cleanup_test_dir_parent(&test_path);
     }
 
     #[test]

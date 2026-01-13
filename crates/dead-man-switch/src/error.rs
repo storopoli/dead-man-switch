@@ -7,6 +7,18 @@ use lettre::{
 use thiserror::Error;
 use toml::{de::Error as DerTomlError, ser::Error as SerTomlError};
 
+/// Home Directory Errors
+#[derive(Error, Debug)]
+pub enum HomeDirError {
+    /// IO operations on home directory.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// Failed to find home directory.
+    #[error("Failed to find home directory")]
+    HomeDirNotFound,
+}
+
 /// Configuration errors
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -25,6 +37,10 @@ pub enum ConfigError {
     /// Attachment not found.
     #[error("Attachment not found")]
     AttachmentNotFound,
+
+    /// Config directory errors.
+    #[error(transparent)]
+    ConfigFile(#[from] HomeDirError),
 }
 
 /// Errors that can occur when sending an email.
