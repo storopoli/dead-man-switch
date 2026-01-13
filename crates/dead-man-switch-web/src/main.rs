@@ -374,7 +374,7 @@ async fn handle_login(
 /// Handles the logout.
 async fn handle_logout(jar: PrivateCookieJar) -> impl IntoResponse {
     let updated_jar = jar.remove(Cookie::from("jwt"));
-    info!("user logged out");
+    info!("User logged out from web interface");
     (updated_jar, Redirect::to("/"))
 }
 
@@ -441,8 +441,13 @@ async fn timer_data(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Instantiate the Config
-    let config = config::load_or_initialize().context("Failed to load or initialize config")?;
+    // Create a new Timer
+    // Will be initialised from any persisted state, or be set to defaults
+    let timer = Timer::new().map_err(|e| anyhow::anyhow!(e))?;
+
+    // Get the Config data.
+    // It will have already been initialize when the new timer was created.
+    let config = config::load_or_initialize().map_err(|e| anyhow::anyhow!(e))?;
 
     // Set up logging
     let log_level = config
@@ -454,6 +459,17 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
     subscriber::set_global_default(subscriber)
         .map_err(|e| anyhow::anyhow!("Setting default subscriber failed: {}", e))?;
+
+    if config.smtp_check_timeout.is_some_and(|t| t > 0) {
+        let smtp_ok = config.check_smtp_connection().is_ok();
+        if smtp_ok {
+            info!("SMTP server verified");
+        } else {
+            error!("SMTP server timeout - Check config");
+        }
+    } else {
+        warn!("SMTP server verification disabled");
+    }
 
     // Hash the password
     let password = config.web_password.clone();
@@ -470,8 +486,6 @@ async fn main() -> anyhow::Result<()> {
         jwt_secret,
     });
 
-    // Create a new Timer
-    let timer = Timer::new().map_err(|e| anyhow::anyhow!(e))?;
     let app_state = Arc::new(AppState {
         config: RwLock::new(config),
         timer: Mutex::new(timer),
@@ -525,7 +539,11 @@ async fn main() -> anyhow::Result<()> {
         .with_state(shared_state);
 
     // Main loop for the timer
-    tokio::spawn(main_timer_loop(app_state));
+    tokio::spawn(async move {
+        if let Err(e) = main_timer_loop(app_state).await {
+            error!(?e, "main timer loop failed");
+        }
+    });
 
     // Run app with axum, listening globally on port 3000
     let port = 3000_u16;

@@ -13,8 +13,42 @@ use lettre::{
 };
 use std::fs;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::sync::mpsc::channel;
+use std::thread;
+use std::time::Duration;
 
 impl Config {
+    pub fn setup_smtp_client(&self) -> Result<SmtpTransport, EmailError> {
+        let creds = Credentials::new(self.username.clone(), self.password.clone());
+        let tls = TlsParameters::new_rustls(self.smtp_server.clone())?;
+        let mailer = SmtpTransport::relay(&self.smtp_server)?
+            .port(self.smtp_port)
+            .credentials(creds)
+            .tls(Tls::Required(tls))
+            .build();
+
+        Ok(mailer)
+    }
+
+    pub fn check_smtp_connection(&self) -> Result<(), EmailError> {
+        let mailer = self.setup_smtp_client()?;
+
+        let (tx, rx) = channel();
+        thread::spawn(move || {
+            let res = mailer.test_connection();
+            let _ = tx.send(res);
+        });
+
+        let timeout = Duration::from_secs(self.smtp_check_timeout.unwrap_or(5));
+        match rx.recv_timeout(timeout) {
+            Ok(Ok(true)) => Ok(()),
+            Ok(Ok(false)) => Err(EmailError::Timeout),
+            Ok(Err(e)) => Err(EmailError::SmtpError(e)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(EmailError::Timeout),
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(EmailError::Timeout),
+        }
+    }
+
     /// Send the email using the provided configuration.
     ///
     /// # Errors
@@ -29,15 +63,7 @@ impl Config {
     /// `application/octet-stream`.
     pub fn send_email(&self, email_type: Email) -> Result<(), EmailError> {
         let email = self.create_email(email_type)?;
-
-        // SMTP client setup
-        let creds = Credentials::new(self.username.clone(), self.password.clone());
-        let tls = TlsParameters::new_rustls(self.smtp_server.clone())?;
-        let mailer = SmtpTransport::relay(&self.smtp_server)?
-            .port(self.smtp_port)
-            .credentials(creds)
-            .tls(Tls::Required(tls))
-            .build();
+        let mailer = self.setup_smtp_client()?;
 
         // Send the email
         mailer.send(&email)?;
@@ -130,6 +156,7 @@ mod tests {
             password: "password".to_string(),
             smtp_server: "smtp.example.com".to_string(),
             smtp_port: 587,
+            smtp_check_timeout: Some(5),
             message: "This is a test message".to_string(),
             message_warning: "This is a test warning message".to_string(),
             subject: "Test Subject".to_string(),
@@ -163,5 +190,30 @@ mod tests {
         assert!(email_result.is_ok());
         let email_result = config.create_email(Email::DeadMan);
         assert!(email_result.is_ok());
+    }
+
+    #[test]
+    fn test_setup_smtp_client() {
+        let config = Config::default();
+
+        // placeholder: just verifying function signature at present
+        let client = config.setup_smtp_client();
+
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_check_smtp_connection() {
+        let mut config = Config::default();
+        config.username = "test_username".to_string();
+        config.password = "test_password".to_string();
+        config.smtp_server = "test_smtp_server".to_string();
+        config.smtp_port = 432;
+        config.smtp_check_timeout = Some(1);
+
+        // placeholder: just verifying function signature at present
+        let client = config.check_smtp_connection();
+
+        assert!(client.is_err());
     }
 }

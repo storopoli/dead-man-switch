@@ -27,6 +27,8 @@ pub struct Config {
     pub smtp_server: String,
     /// The port to use for the SMTP server.
     pub smtp_port: u16,
+    /// The timeout to use for the SMTP server.
+    pub smtp_check_timeout: Option<u64>,
     /// The message to send in the email if you fail to check in
     /// after the `timer_warning` with the additional `timer_dead_man`
     /// seconds have passed.
@@ -71,6 +73,7 @@ impl Default for Config {
             password: "".to_string(),
             smtp_server: "smtp.example.com".to_string(),
             smtp_port: 587,
+            smtp_check_timeout: Some(5),
             message: "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case.".to_string(),
             message_warning: "Hey, you haven't checked in for a while. Are you okay?".to_string(),
             subject: "[URGENT] Something Happened to Me!".to_string(),

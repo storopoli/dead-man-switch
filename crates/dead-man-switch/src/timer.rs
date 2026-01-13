@@ -252,6 +252,7 @@ mod tests {
             password: "password".to_string(),
             smtp_server: "smtp.example.com".to_string(),
             smtp_port: 587,
+            smtp_check_timeout: Some(5),
             message: "This is a test message".to_string(),
             message_warning: "This is a test warning message".to_string(),
             subject: "Test Subject".to_string(),

@@ -5,14 +5,18 @@ username = "me@example.com"
 password = ""
 smtp_server = "smtp.example.com"
 smtp_port = 587
-message = "I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive. Password is our favorite music in Pascal case."
+smtp_check_timeout = 5 # optional
+message = """I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive.
+Password is our favorite music in Pascal case.
+"""
 message_warning = "Hey, you haven't checked in for a while. Are you okay?"
 subject = "[URGENT] Something Happened to Me!"
 subject_warning = "[URGENT] You need to check in!"
 to = "someone@example.com, someone2@example.com"
 from = "me@example.com"
-attachment = "/root/important_file.gpg"                                                                                                                  # optional
-timer_warning = 1209600                                                                                                                                  # 2 weeks
-timer_dead_man = 604800                                                                                                                                  # 1 week
-web_password = "password"
+# attachment = "/root/important_file.gpg" # optional
+timer_warning   = 1209600    # 2 weeks
+timer_dead_man  = 604800     # 1 week
+web_password    = "password"
 cookie_exp_days = 7
+# log_level = "info" # optional

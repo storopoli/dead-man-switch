@@ -97,6 +97,13 @@ pub enum EmailError {
     /// Error when determining the content type of the attachment.
     #[error(transparent)]
     AttachmentPath(#[from] ConfigError),
+
+    /// Timeout error
+    #[error("timeout")]
+    Timeout,
+
+    #[error("smtp error: {0}")]
+    SmtpError(smtp::Error),
 }
 
 /// TUI Error type.
