@@ -1,22 +1,41 @@
 # Template config file for the Dead Man's Switch.
 # Please copy this file to config.toml and fill in the necessary information.
 # Read the README.md for more information on the file location.
-username = "me@example.com"
-password = ""
-smtp_server = "smtp.example.com"
-smtp_port = 587
-smtp_check_timeout = 5 # optional
+
+################################################
+# SMTP
+username           = "me@example.com"
+password           = "password"
+smtp_server        = "smtp.example.com"
+smtp_port          = 587
+smtp_check_timeout = 5                  # optional, 0 = still disabled
+
+################################################
+# Sender (and check-in reminder recipient)
+from = "me@example.com"
+
+# Check-in reminder
+timer_warning = 1209600
+# ... warning email sent if no check-in seen before expiry of timer_warning period
+subject_warning = "[URGENT] You need to check in!"
+message_warning = "Hey, you haven't checked in for a while. Are you okay?"
+
+###############################################
+# Final recipient(s [comma separated])
+to = "someone@example.com, someone2@example.com"
+
+# Final Message
+timer_dead_man = 604800
+# ... sent if no check-in seen at web portal during the timer_warning period PLUS the timer_dead_man period
+subject = "[URGENT] Something Happened to Me!"
 message = """I'm probably dead, go to Central Park NY under bench #137 you'll find an age-encrypted drive.
 Password is our favorite music in Pascal case.
 """
-message_warning = "Hey, you haven't checked in for a while. Are you okay?"
-subject = "[URGENT] Something Happened to Me!"
-subject_warning = "[URGENT] You need to check in!"
-to = "someone@example.com, someone2@example.com"
-from = "me@example.com"
-# attachment = "/root/important_file.gpg" # optional
-timer_warning   = 1209600    # 2 weeks
-timer_dead_man  = 604800     # 1 week
+# absolute path to the file to attach
+# attachment = "/root/important_file.gpg"       # optional
+
+################################################
+# Web portal
 web_password    = "password"
 cookie_exp_days = 7
-# log_level = "info" # optional
+# log_level       = "info"                      # optional
