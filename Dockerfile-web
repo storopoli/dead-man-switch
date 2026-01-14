@@ -28,7 +28,7 @@ COPY --from=builder /usr/src/app/target/release/dead-man-switch-web /usr/local/b
 
 # create non-root user
 RUN useradd -r -u 1000 -m -d /home/dms dms \
- && chown -R dms:dms /usr/local/bin/dead-man-switch-tui /home/dms
+ && chown -R dms:dms /usr/local/bin/dead-man-switch-web /home/dms
 ENV HOME=/home/dms
 USER 1000
 
