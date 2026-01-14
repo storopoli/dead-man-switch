@@ -18,18 +18,27 @@ COPY ./crates ./crates
 RUN cargo build -p dead-man-switch-web --release
 
 # Start a new stage from a slim version of Debian to reduce the size of the final image
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Install libssl3
 RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/app
-
-# Copy the binary from the builder stage to the new stage
+# Copy binaries from builder
 COPY --from=builder /usr/src/app/target/release/dead-man-switch-web /usr/local/bin/dead-man-switch-web
+
+# create non-root user
+RUN useradd -r -u 1000 -m -d /home/dms dms \
+ && chown -R dms:dms /usr/local/bin/dead-man-switch-tui /home/dms
+ENV HOME=/home/dms
+USER 1000
+
+WORKDIR /home/dms/
+
+# Create config directory
+RUN mkdir -p /home/dms/.config/deadman
 
 # Expose port 3000
 EXPOSE 3000
 
 # Command to run the binary
-CMD ["dead-man-switch-web"]
+CMD ["/usr/local/bin/dead-man-switch-web"]
