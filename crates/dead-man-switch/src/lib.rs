@@ -6,6 +6,8 @@
 //! Use at your own risk.
 //! Check the f*(as in friendly) code.
 
+pub mod app;
 pub mod config;
 pub mod email;
+pub mod error;
 pub mod timer;

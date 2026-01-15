@@ -6,3 +6,5 @@ result/
 .envrc
 .direnv/
 .pre-commit-config.yaml
+
+.DS_Store
