@@ -295,6 +295,16 @@ async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
     }
 }
 
+// Handle favicon request
+async fn handle_favicon() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
+}
+
+// Handle health endpoint
+async fn handle_health() -> impl IntoResponse {
+    "OK"
+}
+
 /// Shows the login page or redirects to dashboard if already authenticated.
 async fn show_login(
     Extension(context): Extension<UserContext>,
@@ -513,6 +523,8 @@ async fn main() -> anyhow::Result<()> {
     // Public routes
     let public_routes = Router::new()
         .route("/", get(show_login).post(handle_login))
+        .route("/favicon.ico", get(handle_favicon))
+        .route("/health", get(handle_health))
         .route("/logout", post(handle_logout));
 
     // Combine routes and apply auth middleware to all
