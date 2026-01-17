@@ -4,4 +4,4 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - "./:/home/dms/.config/deadman/"
+      - "./config.toml:/home/dms/.config/deadman/config.toml"
