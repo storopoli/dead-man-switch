@@ -18,9 +18,7 @@ COPY ./crates ./crates
 RUN cargo build -p dead-man-switch-tui --release
 
 # Start a new stage from a slim version of Debian to reduce the size of the final image
-FROM debian:bookworm-slim
-
-WORKDIR /usr/src/app
+FROM debian:trixie-slim
 
 # Install libssl3
 RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib/apt/lists/*
@@ -29,12 +27,15 @@ RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib
 COPY --from=builder /usr/src/app/target/release/dead-man-switch-tui /usr/local/bin/dead-man-switch-tui
 
 # create non-root user
-RUN useradd -r -u 1000 -m -d /home/dms dms && \
-    chown -R dms:dms /usr/local/bin/dead-man-switch-tui /home/dms 
+RUN useradd -r -u 1000 -m -d /home/dms dms \
+ && chown -R dms:dms /usr/local/bin/dead-man-switch-tui /home/dms
 ENV HOME=/home/dms
 USER 1000
+
+WORKDIR /home/dms/
 
 # Create config directory
 RUN mkdir -p /home/dms/.config/deadman
 
+# Command to run the binary
 CMD ["/usr/local/bin/dead-man-switch-tui"]
