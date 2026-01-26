@@ -45,7 +45,7 @@ impl Config {
             Ok(Ok(false)) => Err(EmailError::Timeout),
             Ok(Err(e)) => Err(EmailError::SmtpError(e)),
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(EmailError::Timeout),
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(EmailError::Timeout),
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(EmailError::Disconnected),
         }
     }
 

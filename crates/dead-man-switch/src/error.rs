@@ -102,6 +102,10 @@ pub enum EmailError {
     #[error("timeout")]
     Timeout,
 
+    /// Disconnected error
+    #[error("disconnected")]
+    Disconnected,
+
     #[error("smtp error: {0}")]
     SmtpError(smtp::Error),
 }
