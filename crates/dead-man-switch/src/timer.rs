@@ -40,11 +40,11 @@ pub enum TimerType {
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Timer {
     /// The timer type.
-    pub timer_type: TimerType,
+    timer_type: TimerType,
     /// The start time.
-    pub start: u64,
+    start: u64,
     /// The duration.
-    pub duration: u64,
+    duration: u64,
 }
 
 pub fn system_time_epoch() -> Result<Duration, TimerError> {
