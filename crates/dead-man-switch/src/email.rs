@@ -13,7 +13,9 @@ use lettre::{
 };
 use std::fs;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -32,20 +34,37 @@ impl Config {
 
     pub fn check_smtp_connection(&self) -> Result<(), EmailError> {
         let mailer = self.setup_smtp_client()?;
+        let exit_flag = Arc::new(AtomicBool::new(false)); // owned by the main thread
+        let exit_flag_clone = Arc::clone(&exit_flag); // moved into the spawned thread
 
         let (tx, rx) = channel();
         thread::spawn(move || {
             let res = mailer.test_connection();
-            let _ = tx.send(res);
+            // suppress the send if exit_flag_clone is true
+            if !exit_flag_clone.load(Ordering::SeqCst) {
+                let _ = tx.send(res);
+            }
         });
 
         let timeout = Duration::from_secs(self.smtp_check_timeout.unwrap_or(5));
         match rx.recv_timeout(timeout) {
             Ok(Ok(true)) => Ok(()),
-            Ok(Ok(false)) => Err(EmailError::Timeout),
-            Ok(Err(e)) => Err(EmailError::SmtpError(e)),
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(EmailError::Timeout),
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(EmailError::Disconnected),
+            Ok(Ok(false)) => {
+                exit_flag.store(true, Ordering::SeqCst);
+                Err(EmailError::Timeout)
+            }
+            Ok(Err(e)) => {
+                exit_flag.store(true, Ordering::SeqCst);
+                Err(EmailError::SmtpError(e))
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                exit_flag.store(true, Ordering::SeqCst);
+                Err(EmailError::Timeout)
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                exit_flag.store(true, Ordering::SeqCst);
+                Err(EmailError::Disconnected)
+            }
         }
     }
 
