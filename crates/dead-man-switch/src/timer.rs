@@ -15,11 +15,16 @@ use crate::error::TimerError;
 
 use chrono::Duration as ChronoDuration;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{mpsc, OnceLock};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+static PERSIST_SENDER: OnceLock<mpsc::Sender<Timer>> = OnceLock::new();
+
+const DEFAULT_DEBOUNCE_MS: u64 = 300;
 
 /// The timer enum.
 ///
@@ -45,76 +50,6 @@ pub struct Timer {
     start: u64,
     /// The duration.
     duration: u64,
-}
-
-pub fn system_time_epoch() -> Result<Duration, TimerError> {
-    let now = SystemTime::now();
-    let since_the_epoch = now
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| TimerError::SystemTime)?;
-
-    Ok(since_the_epoch)
-}
-
-/// Load or initialize the persisted state file.
-///
-/// # Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the state directory cannot be created
-///
-pub fn load_or_initialize() -> Result<Timer, TimerError> {
-    let config = config::load_or_initialize()?;
-    let file_path = file_path()?;
-    if !file_path.exists() {
-        let timer = Timer {
-            timer_type: TimerType::Warning,
-            start: system_time_epoch()?.as_secs(),
-            duration: config.timer_warning,
-        };
-
-        update_persisted_state(&timer)?;
-
-        Ok(timer)
-    } else {
-        let timer_str = fs::read_to_string(&file_path)?;
-        let timer: Timer = toml::from_str(timer_str.as_str())?;
-
-        Ok(timer)
-    }
-}
-
-/// Returns the name of the persisted state file.
-fn file_name() -> &'static str {
-    "state.toml"
-}
-
-/// Get the persisted state file path.
-///
-/// # Errors
-///
-/// - Fails if the home directory cannot be found
-///
-pub fn file_path() -> Result<PathBuf, TimerError> {
-    let path = app::file_path(file_name())?;
-    Ok(path)
-}
-
-/// Save the persisted state file.
-///
-/// # Errors
-///
-/// - Fails if the home directory cannot be found
-/// - Fails if the state directory cannot be created
-///
-pub fn update_persisted_state(timer: &Timer) -> Result<(), TimerError> {
-    let file_path = file_path()?;
-    let mut file = File::create(file_path)?;
-    let timer_str = toml::to_string(timer)?;
-
-    file.write_all(timer_str.as_bytes())?;
-
-    Ok(())
 }
 
 impl Timer {
@@ -180,7 +115,7 @@ impl Timer {
             self.duration = dead_man_duration;
         }
 
-        update_persisted_state(self)?;
+        persist_state_background_enqueue(self)?;
 
         Ok(())
     }
@@ -206,10 +141,19 @@ impl Timer {
             }
         }
 
-        update_persisted_state(self)?;
+        persist_state_background_enqueue(self)?;
 
         Ok(())
     }
+}
+
+pub fn system_time_epoch() -> Result<Duration, TimerError> {
+    let now = SystemTime::now();
+    let since_the_epoch = now
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| TimerError::SystemTime)?;
+
+    Ok(since_the_epoch)
 }
 
 /// Formats a duration into a human-readable string adjusting the resolution based on the duration.
@@ -235,6 +179,128 @@ fn format_duration(duration: ChronoDuration) -> String {
     }
 
     parts.join(", ")
+}
+
+/// Load or initialize the persisted state file.
+///
+/// # Errors
+///
+/// - Fails if the home directory cannot be found
+/// - Fails if the state directory cannot be created
+/// - Fails if the state file is not writeable
+///
+pub fn load_or_initialize() -> Result<Timer, TimerError> {
+    let config = config::load_or_initialize()?;
+    let file_path = file_path()?;
+
+    let state = if file_path.exists() {
+        let state_str = fs::read_to_string(&file_path)?;
+        toml::from_str::<Timer>(state_str.as_str())?
+    } else {
+        Timer {
+            timer_type: TimerType::Warning,
+            start: system_time_epoch()?.as_secs(),
+            duration: config.timer_warning,
+        }
+    };
+
+    // ensure we can write state to file (even if it's just been read)
+    persist_state_blocking(&state)?;
+
+    // set the initial state for persistence worker
+    let _ = PERSIST_SENDER.get_or_init(|| spawn_persistence_worker(Some(state.clone())));
+
+    Ok(state)
+}
+
+/// Returns the name of the persisted state file.
+fn file_name() -> &'static str {
+    "state.toml"
+}
+
+/// Get the persisted state file path.
+///
+/// # Errors
+///
+/// - Fails if the home directory cannot be found
+///
+pub fn file_path() -> Result<PathBuf, TimerError> {
+    let path = app::file_path(file_name())?;
+    Ok(path)
+}
+
+pub fn persist_state_blocking(state: &Timer) -> Result<(), TimerError> {
+    let path = file_path()?;
+    persist_state_to_path(&path, state)?;
+    Ok(())
+}
+
+fn persist_state_to_path(path: &PathBuf, state: &Timer) -> Result<(), TimerError> {
+    let state_str = toml::to_string(state)?;
+    write_atomic(path, &state_str)
+}
+
+fn write_atomic(path: &PathBuf, contents: &str) -> Result<(), TimerError> {
+    let tmp_path = path.with_extension("tmp");
+    {
+        let mut tmp = File::create(&tmp_path)?;
+        tmp.write_all(contents.as_bytes())?;
+        tmp.sync_all()?;
+    }
+    fs::rename(&tmp_path, path)?;
+    Ok(())
+}
+
+/// Non-blocking update of the persisted state.
+///
+/// - Only persists if the state has actually changed
+/// - Uses a worker to offload tasks from the main thread
+///
+fn persist_state_background_enqueue(state: &Timer) -> Result<(), TimerError> {
+    let sender = PERSIST_SENDER
+        .get_or_init(|| spawn_persistence_worker(Some(state.clone())))
+        .clone();
+    let _ = sender.send(state.clone());
+    Ok(())
+}
+
+fn spawn_persistence_worker(state: Option<Timer>) -> mpsc::Sender<Timer> {
+    let (tx, rx) = mpsc::channel::<Timer>();
+
+    thread::spawn(move || {
+        let mut last_written: Option<Timer> = state;
+        let debounce = Duration::from_millis(DEFAULT_DEBOUNCE_MS);
+
+        while let Ok(mut snapshot) = rx.recv() {
+            // Drain immediately to get the latest snapshot available now.
+            while let Ok(next) = rx.try_recv() {
+                snapshot = next;
+            }
+
+            // Debounce window: drain any additional updates arriving shortly.
+            let start = Instant::now();
+            while start.elapsed() < debounce {
+                if let Ok(next) = rx.try_recv() {
+                    snapshot = next;
+                } else {
+                    // small sleep to avoid busy-wait
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+
+            // Skip write if identical to last written
+            if last_written.as_ref() == Some(&snapshot) {
+                continue;
+            }
+
+            if let Ok(path) = file_path() {
+                let _ = persist_state_to_path(&path, &snapshot);
+                last_written = Some(snapshot);
+            }
+        }
+    });
+
+    tx
 }
 
 #[cfg(test)]
@@ -370,7 +436,7 @@ mod tests {
             duration: 2,
         };
 
-        let result = update_persisted_state(&timer);
+        let result = persist_state_blocking(&timer);
         assert!(result.is_ok());
 
         let test_path = file_path().unwrap();
