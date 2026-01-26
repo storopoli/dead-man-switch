@@ -13,7 +13,7 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
-use std::io;
+use std::io::{self, Stdout};
 use std::time::Duration;
 
 use dead_man_switch::{
@@ -34,6 +34,41 @@ const ASCII_ART: [&str; 5] = [
 struct SMTPCheck {
     enabled: bool,
     ok: bool,
+}
+
+struct TerminalGuard {
+    terminal: Terminal<CrosstermBackend<Stdout>>,
+}
+
+impl TerminalGuard {
+    fn new() -> Result<Self, TuiError> {
+        // Setup terminal
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let terminal = Terminal::new(backend)?;
+        Ok(Self { terminal })
+    }
+
+    fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<Stdout>> {
+        &mut self.terminal
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        // Restore terminal
+        // ignoring errors and avoiding panics (we're in a drop)
+        let _ = self.terminal.show_cursor();
+        let _ = self.terminal.flush();
+        let _ = execute!(
+            self.terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        );
+        let _ = disable_raw_mode();
+    }
 }
 
 /// Wrapper around [`Timer`].
@@ -307,12 +342,7 @@ fn timer_block(
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
 fn run() -> Result<(), TuiError> {
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut guard = TerminalGuard::new()?;
 
     // Create a new Timer
     // Will be initialised from any persisted state, or be set to defaults
@@ -335,7 +365,9 @@ fn run() -> Result<(), TuiError> {
 
     // Main loop
     loop {
-        terminal.draw(|f| ui(f, &config_path, &smtp_check, &timer))?;
+        guard
+            .terminal_mut()
+            .draw(|f| ui(f, &config_path, &smtp_check, &timer))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
@@ -364,15 +396,6 @@ fn run() -> Result<(), TuiError> {
         let elapsed = timer.0.elapsed();
         timer.0.update(elapsed, config.timer_dead_man)?;
     }
-
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
 
     Ok(())
 }
