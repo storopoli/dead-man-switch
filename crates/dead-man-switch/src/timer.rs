@@ -22,7 +22,7 @@ use std::sync::{mpsc, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-static PERSIST_SENDER: OnceLock<mpsc::Sender<Timer>> = OnceLock::new();
+static PERSIST_SENDER: OnceLock<mpsc::Sender<State>> = OnceLock::new();
 
 const DEFAULT_DEBOUNCE_MS: u64 = 300;
 
@@ -38,18 +38,29 @@ pub enum TimerType {
     DeadMan,
 }
 
+/// The state struct.
+///
+/// Holds the [`TimerType`] and last modified time.
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+pub struct State {
+    /// The timer type.
+    timer_type: TimerType,
+    /// The last modified time.
+    last_modified: u64,
+}
+
 /// The timer struct.
 ///
 /// Holds the [`TimerType`], current start and expiration times.
 /// See [`timer`](crate::timer) module for more information.
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Timer {
     /// The timer type.
     timer_type: TimerType,
     /// The start time.
-    start: u64,
+    start: Instant,
     /// The duration.
-    duration: u64,
+    duration: Duration,
 }
 
 impl Timer {
@@ -67,11 +78,8 @@ impl Timer {
     }
 
     /// Get the elapsed time.
-    pub fn elapsed(&self) -> u64 {
-        match SystemTime::now().duration_since(UNIX_EPOCH + Duration::from_secs(self.start)) {
-            Ok(dur) => dur.as_secs(),
-            Err(_) => 0,
-        }
+    pub fn elapsed(&self) -> Duration {
+        Instant::now().duration_since(self.start)
     }
 
     /// Calculate the remaining time
@@ -79,7 +87,8 @@ impl Timer {
         let elapsed = self.elapsed();
         if elapsed < self.duration {
             let remaining = self.duration.saturating_sub(elapsed);
-            return ChronoDuration::try_seconds(remaining as i64).unwrap_or(ChronoDuration::zero());
+            return ChronoDuration::try_seconds(remaining.as_secs() as i64)
+                .unwrap_or(ChronoDuration::zero());
         }
 
         ChronoDuration::zero()
@@ -90,7 +99,8 @@ impl Timer {
         let remaining_chrono = self.remaining_chrono();
 
         if remaining_chrono > ChronoDuration::zero() {
-            return (remaining_chrono.num_seconds() as f64 / self.duration as f64 * 100.0) as u16;
+            return (remaining_chrono.num_seconds() as f64 / self.duration.as_secs() as f64 * 100.0)
+                as u16;
         }
 
         0
@@ -108,14 +118,16 @@ impl Timer {
 
     /// Update the timer logic for switching from [`TimerType::Warning`] to
     /// [`TimerType::DeadMan`].
-    pub fn update(&mut self, elapsed: u64, dead_man_duration: u64) -> Result<(), TimerError> {
+    pub fn update(&mut self, elapsed: Duration, dead_man_duration: u64) -> Result<(), TimerError> {
         if self.timer_type == TimerType::Warning && elapsed >= self.duration {
             self.timer_type = TimerType::DeadMan;
-            self.start = system_time_epoch()?.as_secs();
-            self.duration = dead_man_duration;
-        }
+            // Reset the start time for the DeadMan timer
+            self.start = Instant::now();
+            self.duration = Duration::from_secs(dead_man_duration);
 
-        persist_state_background_enqueue(self)?;
+            let state = state_from_timer(self)?;
+            persist_state_non_blocking(state)?;
+        }
 
         Ok(())
     }
@@ -130,30 +142,15 @@ impl Timer {
     ///
     /// This is called when the user checks in.
     pub fn reset(&mut self, config: &crate::config::Config) -> Result<(), TimerError> {
-        match self.get_type() {
-            TimerType::Warning => {
-                self.start = system_time_epoch()?.as_secs();
-            }
-            TimerType::DeadMan => {
-                self.timer_type = TimerType::Warning;
-                self.start = system_time_epoch()?.as_secs();
-                self.duration = config.timer_warning;
-            }
-        }
+        let (timer, state) = default_timer_and_state(config)?;
+        self.timer_type = timer.timer_type;
+        self.start = timer.start;
+        self.duration = timer.duration;
 
-        persist_state_background_enqueue(self)?;
+        persist_state_non_blocking(state)?;
 
         Ok(())
     }
-}
-
-pub fn system_time_epoch() -> Result<Duration, TimerError> {
-    let now = SystemTime::now();
-    let since_the_epoch = now
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| TimerError::SystemTime)?;
-
-    Ok(since_the_epoch)
 }
 
 /// Formats a duration into a human-readable string adjusting the resolution based on the duration.
@@ -193,24 +190,58 @@ pub fn load_or_initialize() -> Result<Timer, TimerError> {
     let config = config::load_or_initialize()?;
     let file_path = file_path()?;
 
-    let state = if file_path.exists() {
-        let state_str = fs::read_to_string(&file_path)?;
-        toml::from_str::<Timer>(state_str.as_str())?
-    } else {
-        Timer {
-            timer_type: TimerType::Warning,
-            start: system_time_epoch()?.as_secs(),
-            duration: config.timer_warning,
+    // try to read persisted state; if it fails, fall back to default timer
+    let (timer, state) = match fs::read_to_string(&file_path) {
+        Ok(state_str) => {
+            match toml::from_str::<State>(state_str.as_str()) {
+                Ok(state) => {
+                    // persistence file OK - setup timer based on persisted state
+                    let wall_elapsed = wall_elapsed(state.last_modified);
+                    // Build a monotonic start Instant such that
+                    // Instant::now() - start == wall_elapsed,
+                    // but guard against underflow using checked_sub.
+                    let now_mono = Instant::now();
+                    let start = match now_mono.checked_sub(wall_elapsed) {
+                        Some(s) => s,
+                        None => now_mono, // clamp to zero elapsed
+                    };
+                    let timer = Timer {
+                        timer_type: state.timer_type,
+                        start,
+                        duration: match state.timer_type {
+                            TimerType::Warning => Duration::from_secs(config.timer_warning),
+                            TimerType::DeadMan => Duration::from_secs(config.timer_dead_man),
+                        },
+                    };
+                    (timer, state)
+                }
+                // parse error: fall back to default (same behaviour as "no persistence file")
+                Err(_) => default_timer_and_state(&config)?,
+            }
         }
+        // no persisted file: use default (same behaviour as "no persistence file")
+        Err(_) => default_timer_and_state(&config)?,
     };
-
-    // ensure we can write state to file (even if it's just been read)
-    persist_state_blocking(&state)?;
 
     // set the initial state for persistence worker
     let _ = PERSIST_SENDER.get_or_init(|| spawn_persistence_worker(Some(state.clone())));
 
-    Ok(state)
+    // ensure we can write state to file (even if it's just been read)
+    // this is a chance to verify write-ability (future writes will be handled by background task)
+    persist_state_blocking(state)?;
+
+    Ok(timer)
+}
+
+fn default_timer_and_state(config: &config::Config) -> Result<(Timer, State), TimerError> {
+    let timer = Timer {
+        timer_type: TimerType::Warning,
+        start: Instant::now(),
+        duration: Duration::from_secs(config.timer_warning),
+    };
+    let state = state_from_timer(&timer)?;
+
+    Ok((timer, state))
 }
 
 /// Returns the name of the persisted state file.
@@ -226,49 +257,72 @@ fn file_name() -> &'static str {
 ///
 pub fn file_path() -> Result<PathBuf, TimerError> {
     let path = app::file_path(file_name())?;
+
     Ok(path)
 }
 
-pub fn persist_state_blocking(state: &Timer) -> Result<(), TimerError> {
-    let path = file_path()?;
-    persist_state_to_path(&path, state)?;
-    Ok(())
+// wall clock
+pub fn system_time_epoch() -> Result<Duration, TimerError> {
+    let now_wall = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(TimerError::SystemTime)?;
+
+    Ok(now_wall)
 }
 
-fn persist_state_to_path(path: &PathBuf, state: &Timer) -> Result<(), TimerError> {
-    let state_str = toml::to_string(state)?;
-    write_atomic(path, &state_str)
-}
-
-fn write_atomic(path: &PathBuf, contents: &str) -> Result<(), TimerError> {
-    let tmp_path = path.with_extension("tmp");
-    {
-        let mut tmp = File::create(&tmp_path)?;
-        tmp.write_all(contents.as_bytes())?;
-        tmp.sync_all()?;
-    }
-    fs::rename(&tmp_path, path)?;
-    Ok(())
-}
-
-/// Non-blocking update of the persisted state.
+/// Compute wall elapsed since last modified
 ///
-/// - Only persists if the state has actually changed
+/// If last_modified is in the future (relative to current wall clock)
+/// clamp to zero so we don't artificially extend the timer
+fn wall_elapsed(last_modified: u64) -> Duration {
+    let persisted_last_modified = Duration::from_secs(last_modified);
+    let now_wall = system_time_epoch().unwrap_or(Duration::from_secs(0));
+
+    if now_wall > persisted_last_modified {
+        now_wall - persisted_last_modified
+    } else {
+        Duration::from_secs(0)
+    }
+}
+
+fn state_from_timer(timer: &Timer) -> Result<State, TimerError> {
+    let state = State {
+        timer_type: timer.timer_type,
+        last_modified: system_time_epoch()?.as_secs(),
+    };
+
+    Ok(state)
+}
+
+/// Blocking persistence of state.
+///
+/// - Only used at app initialisation (allows foreground verification of persistence)
+///
+pub fn persist_state_blocking(state: State) -> Result<(), TimerError> {
+    let path = file_path()?;
+    persist_state_to_path(&path, &state)?;
+
+    Ok(())
+}
+
+/// Non-blocking persistence of state.
+///
+/// - Only persists if the state has changed (debounced)
 /// - Uses a worker to offload tasks from the main thread
 ///
-fn persist_state_background_enqueue(state: &Timer) -> Result<(), TimerError> {
+fn persist_state_non_blocking(state: State) -> Result<(), TimerError> {
     let sender = PERSIST_SENDER
         .get_or_init(|| spawn_persistence_worker(Some(state.clone())))
         .clone();
-    let _ = sender.send(state.clone());
+    let _ = sender.send(state);
     Ok(())
 }
 
-fn spawn_persistence_worker(state: Option<Timer>) -> mpsc::Sender<Timer> {
-    let (tx, rx) = mpsc::channel::<Timer>();
+fn spawn_persistence_worker(state: Option<State>) -> mpsc::Sender<State> {
+    let (tx, rx) = mpsc::channel::<State>();
 
     thread::spawn(move || {
-        let mut last_written: Option<Timer> = state;
+        let mut last_written: Option<State> = state;
         let debounce = Duration::from_millis(DEFAULT_DEBOUNCE_MS);
 
         while let Ok(mut snapshot) = rx.recv() {
@@ -303,12 +357,29 @@ fn spawn_persistence_worker(state: Option<Timer>) -> mpsc::Sender<Timer> {
     tx
 }
 
+fn persist_state_to_path(path: &PathBuf, state: &State) -> Result<(), TimerError> {
+    let state_str = toml::to_string(state)?;
+    write_atomic(path, state_str.as_bytes())
+}
+
+fn write_atomic(path: &PathBuf, data: &[u8]) -> Result<(), TimerError> {
+    let tmp_path = path.with_extension("tmp");
+    {
+        let mut tmp = File::create(&tmp_path)?;
+        tmp.write_all(data)?;
+        tmp.sync_all()?;
+    }
+    fs::rename(&tmp_path, path)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::Config;
     use std::fs::{self, File};
     use std::io::Write;
+    use std::ops::Sub;
     use std::path::Path;
     use std::thread::sleep;
 
@@ -336,7 +407,7 @@ mod tests {
 
     struct TestGuard;
     impl TestGuard {
-        fn new(t: &Timer) -> Self {
+        fn new(s: &State) -> Self {
             // setup before test
 
             let file_path = file_path().expect("setup: failed file_path()");
@@ -346,8 +417,8 @@ mod tests {
                 fs::create_dir_all(parent).expect("setup: failed to create dir");
             }
             let mut file = File::create(file_path).expect("setup: failed to create file");
-            let t_str = toml::to_string(t).expect("setup: failed to convert data");
-            file.write_all(t_str.as_bytes())
+            let s_str = toml::to_string(s).expect("setup: failed to convert data");
+            file.write_all(s_str.as_bytes())
                 .expect("setup: failed to write data");
             file.sync_all()
                 .expect("setup: failed to ensure file written to disk");
@@ -378,10 +449,10 @@ mod tests {
     }
 
     // helper
-    fn load_timer_from_path(path: &PathBuf) -> Timer {
-        let timer_str = fs::read_to_string(path).expect("helper: error reading timer data");
-        let timer: Timer = toml::from_str(&timer_str).expect("helper: error parsing timer data");
-        timer
+    fn load_state_from_path(path: &PathBuf) -> State {
+        let state_str = fs::read_to_string(path).expect("helper: error reading state data");
+        let state: State = toml::from_str(&state_str).expect("helper: error parsing state data");
+        state
     }
 
     #[test]
@@ -390,8 +461,8 @@ mod tests {
         let result = file_path();
         assert!(result.is_ok());
 
-        let result = result.unwrap();
         let expected = format!("{}_test", app::name());
+        let result = result.unwrap();
         assert!(result.to_string_lossy().contains(expected.as_str()));
 
         // It should also of course contain the actual file name
@@ -409,20 +480,14 @@ mod tests {
         let result = system_time_epoch();
         assert!(result.is_ok());
 
+        let expected_range_low = 1767225600; // 2026-01-01 00:00:00
+        let expected_range_high = 4102444800; // 2100-01-01 00:00:00
         let result = result.unwrap().as_secs();
-        let expected = 1767225600; // 2026-01-01
         assert!(
-            result > expected,
-            "expected: (after 2026-01-01) '{:?}' got: '{:?}')",
-            expected,
-            result
-        );
-
-        let expected = 4102444800; // 2100-01-01
-        assert!(
-            result < expected,
-            "expected: (before 2100-01-01) '{:?}' got: '{:?}')",
-            expected,
+            result >= expected_range_low && result <= expected_range_high,
+            "expected: between {:?} (2026-01-01 00:00:00) and {:?} (2100-01-01 00:00:00) (got: {:?})",
+            expected_range_low,
+            expected_range_high,
             result
         );
     }
@@ -430,69 +495,80 @@ mod tests {
     #[test]
     fn update_persisted_state_ok() {
         // Set state for this test
-        let timer = Timer {
+        let state = State {
             timer_type: TimerType::Warning,
-            start: 1,
-            duration: 2,
+            last_modified: 1,
         };
 
-        let result = persist_state_blocking(&timer);
+        let result = persist_state_blocking(state.clone());
         assert!(result.is_ok());
 
         let test_path = file_path().unwrap();
-        let loaded_timer = load_timer_from_path(&test_path);
-        // Compare against the original timer instance
-        assert_eq!(loaded_timer, timer);
+        let loaded_state = load_state_from_path(&test_path);
+        // Compare against the original state instance
+        assert_eq!(loaded_state, state);
 
         // Cleanup any created directories
         cleanup_test_dir_parent(&test_path);
     }
 
     #[test]
-    fn timer_guard_ok() {
+    fn state_guard_ok() {
         // This test verifies that the guard is working as expected
-        // by saving a timer and reading it back
+        // by saving a state and reading it back
 
         // Set state for this test
-        let timer = Timer {
-            timer_type: TimerType::Warning,
-            start: 1,
-            duration: 2,
+        let state = State {
+            timer_type: TimerType::DeadMan,
+            last_modified: 2,
         };
-        let _guard = TestGuard::new(&timer);
+        let _guard = TestGuard::new(&state);
 
-        // Compare against the same timer instance saved by guard
+        // Compare against the same state instance saved by guard
         let test_path = file_path().unwrap();
-        let loaded_timer = load_timer_from_path(&test_path);
-        assert_eq!(loaded_timer, timer);
+        let loaded_state = load_state_from_path(&test_path);
+        assert_eq!(loaded_state, state);
     }
 
     #[test]
     fn load_or_initialize_with_existing_file() {
         // Set state for this test
-        let existing_timer = Timer {
-            timer_type: TimerType::DeadMan,
-            start: 3,
-            duration: 4,
+        let existing_state_1 = State {
+            timer_type: TimerType::Warning,
+            last_modified: 3,
         };
-        let _guard = TestGuard::new(&existing_timer);
+        let existing_state_2 = State {
+            timer_type: TimerType::DeadMan,
+            last_modified: 4,
+        };
 
-        // With timer data persisted, we should see a timer with those values
+        let _guard_1 = TestGuard::new(&existing_state_1);
+
+        // With state data persisted, we should see a timer with those values
         let timer = load_or_initialize().unwrap();
 
-        // Compare loaded timer against the existing timer data that was saved
-        assert_eq!(timer, existing_timer);
+        // Compare loaded timer against the existing state data that was saved
+        assert_eq!(timer.timer_type, existing_state_1.timer_type);
+
+        let _guard_2 = TestGuard::new(&existing_state_2);
+
+        // With state data persisted, we should see a timer with those values
+        let timer = load_or_initialize().unwrap();
+
+        // Compare loaded timer against the existing state data that was saved
+        assert_eq!(timer.timer_type, existing_state_2.timer_type);
     }
 
     #[test]
     fn load_or_initialize_with_no_existing_file() {
+        // get default config so we can use its timer_warning later
         let config = Config::default();
 
         // With no previous data persisted, we should see a timer with defaults
         let timer = load_or_initialize().unwrap();
 
-        let result = timer.timer_type;
         let expected = TimerType::Warning;
+        let result = timer.timer_type;
         assert!(
             result == expected,
             "expected: '{:?}' got: '{:?}')",
@@ -500,23 +576,11 @@ mod tests {
             result
         );
 
+        let expected = Duration::from_secs(config.timer_warning);
         let result = timer.duration;
-        let expected = config.timer_warning;
         assert!(
             result == expected,
             "expected: '{:?}' got: '{:?}')",
-            expected,
-            result
-        );
-
-        // checking time can be tricky in tests, so just check that it's within 10 seconds
-        let result = timer.start;
-        let expected = system_time_epoch()
-            .expect("failed to get current time")
-            .as_secs();
-        assert!(
-            result > (expected - 10) && result < (expected + 10),
-            "expected (within 10 of): '{:?}' got: '{:?}')",
             expected,
             result
         );
@@ -527,84 +591,176 @@ mod tests {
     }
 
     #[test]
-    fn timer_remaining_chrono() {
+    fn timer_remaining_chrono_with_state_in_past() {
+        let default_config = config::load_or_initialize().expect("failed to load default config");
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: system_time_epoch()
-                .expect("failed to get current time")
-                .as_secs(),
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: 2,
+            last_modified: now_wall - 10000,
         });
 
         let timer = Timer::new().expect("failed to create new timer");
 
+        let tolerance_secs = 5;
+        let expected_range_high =
+            chrono::TimeDelta::new((default_config.timer_warning - 10000) as i64, 0)
+                .expect("failed creating time delta");
+        let expected_range_low = expected_range_high
+            .sub(chrono::TimeDelta::new(tolerance_secs, 0).expect("failed creating time delta"));
         let result = timer.remaining_chrono();
-        let time_delta = chrono::TimeDelta::new(1, 0).expect("failed creating time delta");
+        // result should be in the range (tolerance for slow tests)
         assert!(
-            result > time_delta,
-            "expected: timer.remaining_chrono() > 1 (got: {:?})",
+            result >= expected_range_low && result <= expected_range_high,
+            "expected: timer.remaining_chrono() between {:?} and {:?} (got: {:?})",
+            expected_range_low,
+            expected_range_high,
+            result
+        );
+    }
+
+    #[test]
+    fn timer_remaining_chrono_with_state_in_future() {
+        let default_config = config::load_or_initialize().expect("failed to load default config");
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
+        // Set state for this test
+        // a system time in the future should not increase remaining chrono time
+        let _guard = TestGuard::new(&State {
+            timer_type: TimerType::Warning,
+            last_modified: now_wall + 1000,
+        });
+
+        let timer = Timer::new().expect("failed to create new timer");
+
+        let tolerance_secs = 5;
+        let expected_range_high = chrono::TimeDelta::new((default_config.timer_warning) as i64, 0)
+            .expect("failed creating time delta");
+        let expected_range_low = expected_range_high
+            .sub(chrono::TimeDelta::new(tolerance_secs, 0).expect("failed creating time delta"));
+        // result should be in the range (tolerance for slow tests)
+        let result = timer.remaining_chrono();
+        assert!(
+            result >= expected_range_low && result <= expected_range_high,
+            "expected: timer.remaining_chrono() between {:?} and {:?} (got: {:?})",
+            expected_range_low,
+            expected_range_high,
+            result
+        );
+    }
+
+    #[test]
+    fn timer_remaining_chrono_with_state() {
+        let mut config = get_test_config();
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
+        // Set state for this test
+        let _guard = TestGuard::new(&State {
+            timer_type: TimerType::Warning,
+            last_modified: now_wall,
+        });
+
+        let mut timer = Timer::new().expect("failed to create new timer");
+
+        config.timer_warning = 2;
+        // reset allows injection of (test) config
+        timer.reset(&config).expect("failed to reset timer");
+
+        let expected = chrono::TimeDelta::new(2, 0).expect("failed creating time delta");
+        let result = timer.remaining_chrono();
+        assert!(
+            result <= expected,
+            "expected: timer.remaining_chrono() < {:?} (got: {:?})",
+            expected,
             result
         );
 
         sleep(Duration::from_secs(2));
 
+        let expected = chrono::TimeDelta::new(1, 0).expect("failed creating time delta");
         let result = timer.remaining_chrono();
         assert!(
-            result < time_delta,
-            "expected: timer.remaining_chrono() < 1 (got: {:?})",
+            result <= expected,
+            "expected: timer.remaining_chrono() < {:?} (got: {:?})",
+            expected,
             result
         );
     }
 
     #[test]
     fn timer_elapsed_less_than_duration() {
+        let mut config = get_test_config();
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: system_time_epoch()
-                .expect("failed to get current time")
-                .as_secs(),
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: 60,
+            last_modified: now_wall,
         });
 
-        let timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new().expect("failed to create new timer");
 
+        config.timer_warning = 60;
+        // reset allows injection of (test) config
+        timer.reset(&config).expect("failed to reset timer");
+
+        let expected = Duration::from_secs(2);
         let result = timer.elapsed();
         assert!(
-            result < 2,
-            "expected: timer.elapsed() < 2 (got: {:?})",
+            result < expected,
+            "expected: timer.elapsed() < {:?} (got: {:?})",
+            expected,
             result
         );
 
         sleep(Duration::from_secs_f64(1.5));
 
+        let expected = Duration::from_secs(1);
         let result = timer.elapsed();
         assert!(
-            result >= 1,
-            "expected: timer.elapsed() >= 1 (got: {:?})",
+            result > expected,
+            "expected: timer.elapsed() > {:?} (got: {:?})",
+            expected,
             result
         );
     }
 
     #[test]
     fn timer_update_to_dead_man() {
+        let mut config = get_test_config();
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: system_time_epoch()
-                .expect("failed to get current time")
-                .as_secs(),
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: 1,
+            last_modified: now_wall,
         });
 
         let mut timer = Timer::new().expect("failed to create new timer");
 
-        // Simulate elapsed time by directly manipulating the timer's state.
-        timer.update(2, 3600).expect("Failed to update timer");
+        config.timer_warning = 1;
+        // reset allows injection of (test) config
+        timer.reset(&config).expect("failed to reset timer");
 
-        let result = timer.get_type();
-        let expected = TimerType::DeadMan;
+        // verify timer still in TimerType::Warning
+        let expected = TimerType::Warning;
+        let result = timer.timer_type;
         assert!(
             result == expected,
             "expected: '{:?}' got: '{:?}')",
@@ -612,8 +768,9 @@ mod tests {
             result
         );
 
+        // verify timer still has expected timer_warning
+        let expected = Duration::from_secs(config.timer_warning);
         let result = timer.duration;
-        let expected = 3600;
         assert!(
             result == expected,
             "expected: '{:?}' got: '{:?}')",
@@ -621,8 +778,31 @@ mod tests {
             result
         );
 
-        let result = timer.expired();
+        // Simulate elapsed time by directly manipulating the timer's state.
+        timer
+            .update(Duration::from_secs(2), 3600)
+            .expect("Failed to update timer");
+
+        let expected = TimerType::DeadMan;
+        let result = timer.get_type();
+        assert!(
+            result == expected,
+            "expected: '{:?}' got: '{:?}')",
+            expected,
+            result
+        );
+
+        let expected = Duration::from_secs(3600);
+        let result = timer.duration;
+        assert!(
+            result == expected,
+            "expected: '{:?}' got: '{:?}')",
+            expected,
+            result
+        );
+
         let expected = false;
+        let result = timer.expired();
         assert!(
             result == expected,
             "expected: '{:?}' got: '{:?}')",
@@ -633,22 +813,54 @@ mod tests {
 
     #[test]
     fn timer_expiration() {
+        let mut config = get_test_config();
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: system_time_epoch()
-                .expect("failed to get current time")
-                .as_secs(),
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: 0,
+            last_modified: now_wall,
         });
 
-        let timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new().expect("failed to create new timer");
+
+        config.timer_warning = 1;
+        // reset allows injection of (test) config
+        timer.reset(&config).expect("failed to reset timer");
+
+        // verify timer still in TimerType::Warning
+        let expected = TimerType::Warning;
+        let result = timer.timer_type;
+        assert!(
+            result == expected,
+            "expected: '{:?}' got: '{:?}')",
+            expected,
+            result
+        );
+
+        // verify timer still has expected timer_warning
+        let expected = Duration::from_secs(config.timer_warning);
+        let result = timer.duration;
+        assert!(
+            result == expected,
+            "expected: '{:?}' got: '{:?}')",
+            expected,
+            result
+        );
+
+        // Simulate elapsed time by directly manipulating the timer's state.
+        timer
+            .update(Duration::from_secs(2), 1)
+            .expect("Failed to update timer");
 
         // Directly simulate the passage of time
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(2));
 
-        let result = timer.expired();
         let expected = true;
+        let result = timer.expired();
         assert!(
             result == expected,
             "expected: '{:?}' got: '{:?}')",
@@ -659,21 +871,30 @@ mod tests {
 
     #[test]
     fn timer_remaining_percent() {
+        let mut config = get_test_config();
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: system_time_epoch()
-                .expect("failed to get current time")
-                .as_secs(),
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: 2,
+            last_modified: now_wall,
         });
 
-        let timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new().expect("failed to create new timer");
 
+        config.timer_warning = 2;
+        // reset allows injection of (test) config
+        timer.reset(&config).expect("failed to reset timer");
+
+        let expected = 0;
         let result = timer.remaining_percent();
         assert!(
-            result > 0,
-            "expected: timer.remaining_percent() > 0 (got: {:?})",
+            result > expected,
+            "expected: timer.remaining_percent() > {:?} (got: {:?})",
+            expected,
             result
         );
 
@@ -682,27 +903,35 @@ mod tests {
 
         let result = timer.remaining_percent();
         assert!(
-            result == 0,
-            "expected: timer.remaining_percent() == 0 (got: {:?})",
+            result == expected,
+            "expected: timer.remaining_percent() == {:?} (got: {:?})",
+            expected,
             result
         );
     }
 
     #[test]
     fn timer_label() {
+        let mut config = get_test_config();
+
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: system_time_epoch()
-                .expect("failed to get current time")
-                .as_secs(),
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: 2,
+            last_modified: now_wall,
         });
 
-        let timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new().expect("failed to create new timer");
 
-        let result = timer.label();
+        config.timer_warning = 2;
+        // reset allows injection of (test) config
+        timer.reset(&config).expect("failed to reset timer");
+
         let expected = "0 second(s)";
+        let result = timer.label();
         assert!(
             result != expected,
             "expected: timer.label() != {:?} (got: {:?})",
@@ -779,11 +1008,14 @@ mod tests {
     fn reset_warning_timer_resets_start_time() {
         let config = get_test_config();
 
+        let now_wall = system_time_epoch()
+            .expect("failed to get current time")
+            .as_secs();
+
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: 1767225600, // 2026-01-01
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::Warning,
-            duration: config.timer_warning,
+            last_modified: now_wall - 60,
         });
 
         let mut timer = Timer::new().expect("failed to create new timer");
@@ -792,8 +1024,8 @@ mod tests {
 
         timer.reset(&config).expect("failed to reset timer");
 
-        let result = timer.start;
         let expected = original_start;
+        let result = timer.start;
         assert!(
             result > expected,
             "expected: timer.start > {:?} (got: {:?})",
@@ -801,8 +1033,8 @@ mod tests {
             result
         );
 
+        let expected = Duration::from_secs(config.timer_warning);
         let result = timer.duration;
-        let expected = config.timer_warning;
         assert!(
             result == expected,
             "expected: timer.duration == {:?} (got: {:?})",
@@ -810,8 +1042,8 @@ mod tests {
             result
         );
 
-        let result = timer.get_type();
         let expected = TimerType::Warning;
+        let result = timer.get_type();
         assert!(
             result == expected,
             "expected: timer.get_type() == {:?} (got: {:?})",
@@ -825,18 +1057,19 @@ mod tests {
         let config = get_test_config();
 
         // Set state for this test
-        let _guard = TestGuard::new(&Timer {
-            start: 1767225600, // 2026-01-01
+        let _guard = TestGuard::new(&State {
             timer_type: TimerType::DeadMan,
-            duration: config.timer_dead_man,
+            last_modified: system_time_epoch()
+                .expect("failed to get current time")
+                .as_secs(),
         });
 
         let mut timer = Timer::new().expect("failed to create new timer");
 
         timer.reset(&config).expect("failed to reset timer");
 
+        let expected = Duration::from_secs(config.timer_warning);
         let result = timer.duration;
-        let expected = config.timer_warning;
         assert!(
             result == expected,
             "expected: timer.duration == {:?} (got: {:?})",
@@ -844,8 +1077,8 @@ mod tests {
             result
         );
 
-        let result = timer.get_type();
         let expected = TimerType::Warning;
+        let result = timer.get_type();
         assert!(
             result == expected,
             "expected: timer.get_type() == {:?} (got: {:?})",

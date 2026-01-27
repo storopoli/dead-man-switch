@@ -67,8 +67,8 @@ pub enum TimerError {
     ConfigFile(#[from] HomeDirError),
 
     /// SystemTime error
-    #[error("System time too old")]
-    SystemTime,
+    #[error("System time error: {0}")]
+    SystemTime(#[from] std::time::SystemTimeError),
 }
 
 /// Errors that can occur when sending an email.
