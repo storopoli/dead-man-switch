@@ -29,4 +29,4 @@ uuid = { version = "1.19.0", features = ["v4", "serde"] }
 chrono = { workspace = true, features = ["serde"] }
 
 # Rate limiting
-tower = { version = "0.5.2", features = ["buffer", "limit"] }
+tower = { version = "0.5.3", features = ["buffer", "limit"] }
