@@ -13,7 +13,7 @@ dead-man-switch.workspace = true
 zeroize.workspace = true
 
 anyhow = "1.0.100"
-askama = "0.14.0"
+askama = "0.15.1"
 axum = "0.8.8"
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
