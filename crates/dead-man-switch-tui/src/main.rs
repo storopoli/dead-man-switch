@@ -344,14 +344,13 @@ fn timer_block(
 fn run() -> Result<(), TuiError> {
     let mut guard = TerminalGuard::new()?;
 
-    // Create a new Timer
-    // Will be initialised from any persisted state, or be set to defaults
-    let mut timer = TuiTimer::new(Timer::new()?);
-
     // Get the Config data.
-    // It will have already been initialize when the new timer was created.
     let config = config::load_or_initialize()?;
     let config_path = config::file_path()?.to_string_lossy().into_owned();
+
+    // Create a new Timer
+    // Will be initialised from any persisted state, or be set to defaults
+    let mut timer = TuiTimer::new(Timer::new(&config)?);
 
     let mut smtp_check = SMTPCheck {
         enabled: config.smtp_check_timeout.is_some_and(|t| t > 0),

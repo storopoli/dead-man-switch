@@ -456,12 +456,7 @@ async fn timer_data(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Create a new Timer
-    // Will be initialised from any persisted state, or be set to defaults
-    let timer = Timer::new().map_err(|e| anyhow::anyhow!(e))?;
-
     // Get the Config data.
-    // It will have already been initialize when the new timer was created.
     let config = config::load_or_initialize().map_err(|e| anyhow::anyhow!(e))?;
 
     // Set up logging
@@ -474,6 +469,10 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
     subscriber::set_global_default(subscriber)
         .map_err(|e| anyhow::anyhow!("Setting default subscriber failed: {}", e))?;
+
+    // Create a new Timer
+    // Will be initialised from any persisted state, or be set to defaults
+    let timer = Timer::new(&config).map_err(|e| anyhow::anyhow!(e))?;
 
     if config.smtp_check_timeout.is_some_and(|t| t > 0) {
         let smtp_ok = config.check_smtp_connection().is_ok();

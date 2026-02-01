@@ -10,7 +10,7 @@
 //!    attachment to the user's configured `To` email address upon expiration.
 
 use crate::app;
-use crate::config;
+use crate::config::Config;
 use crate::error::TimerError;
 
 use chrono::Duration as ChronoDuration;
@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use std::sync::{mpsc, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tracing::{error, trace, warn};
 
 static PERSIST_SENDER: OnceLock<mpsc::Sender<State>> = OnceLock::new();
 
@@ -65,8 +66,8 @@ pub struct Timer {
 
 impl Timer {
     /// Create a new timer.
-    pub fn new() -> Result<Self, TimerError> {
-        let timer = load_or_initialize()?;
+    pub fn new(config: &Config) -> Result<Self, TimerError> {
+        let timer = load_or_initialize(config)?;
 
         Ok(timer)
     }
@@ -186,8 +187,7 @@ fn format_duration(duration: ChronoDuration) -> String {
 /// - Fails if the state directory cannot be created
 /// - Fails if the state file is not writeable
 ///
-pub fn load_or_initialize() -> Result<Timer, TimerError> {
-    let config = config::load_or_initialize()?;
+pub fn load_or_initialize(config: &Config) -> Result<Timer, TimerError> {
     let file_path = file_path()?;
 
     // try to read persisted state; if it fails, fall back to default timer
@@ -215,12 +215,25 @@ pub fn load_or_initialize() -> Result<Timer, TimerError> {
                     };
                     (timer, state)
                 }
-                // parse error: fall back to default (same behaviour as "no persistence file")
-                Err(_) => default_timer_and_state(&config)?,
+                Err(e) => {
+                    // fall back to default (same behaviour as "no persistence file")
+                    warn!(
+                        error = ?e,
+                        path = %file_path.display(),
+                        "persisted file parse error: using defaults"
+                    );
+                    default_timer_and_state(config)?
+                }
             }
         }
-        // no persisted file: use default (same behaviour as "no persistence file")
-        Err(_) => default_timer_and_state(&config)?,
+        Err(_) => {
+            // fall back to default (same behaviour as "no persistence file")
+            trace!(
+                path = %file_path.display(),
+                "no persisted file found: using defaults"
+            );
+            default_timer_and_state(config)?
+        }
     };
 
     // set the initial state for persistence worker
@@ -233,7 +246,7 @@ pub fn load_or_initialize() -> Result<Timer, TimerError> {
     Ok(timer)
 }
 
-fn default_timer_and_state(config: &config::Config) -> Result<(Timer, State), TimerError> {
+fn default_timer_and_state(config: &Config) -> Result<(Timer, State), TimerError> {
     let timer = Timer {
         timer_type: TimerType::Warning,
         start: Instant::now(),
@@ -300,7 +313,10 @@ fn state_from_timer(timer: &Timer) -> Result<State, TimerError> {
 ///
 pub fn persist_state_blocking(state: State) -> Result<(), TimerError> {
     let path = file_path()?;
-    persist_state_to_path(&path, &state)?;
+    if let Err(e) = persist_state_to_path(&path, &state) {
+        error!(error = ?e, path = %path.display(), "persist new state failed");
+        return Err(e);
+    }
 
     Ok(())
 }
@@ -314,7 +330,9 @@ fn persist_state_non_blocking(state: State) -> Result<(), TimerError> {
     let sender = PERSIST_SENDER
         .get_or_init(|| spawn_persistence_worker(Some(state.clone())))
         .clone();
-    let _ = sender.send(state);
+    if let Err(e) = sender.send(state) {
+        error!(error = ?e, "failed to enqueue persistence of state; background worker may have stopped");
+    }
     Ok(())
 }
 
@@ -344,12 +362,17 @@ fn spawn_persistence_worker(state: Option<State>) -> mpsc::Sender<State> {
 
             // Skip write if identical to last written
             if last_written.as_ref() == Some(&snapshot) {
+                trace!("skipping persist state: identical to last written");
                 continue;
             }
 
             if let Ok(path) = file_path() {
-                let _ = persist_state_to_path(&path, &snapshot);
-                last_written = Some(snapshot);
+                if let Err(e) = persist_state_to_path(&path, &snapshot) {
+                    error!(error = ?e, path = %path.display(), "persist new state failed");
+                } else {
+                    trace!(path = %path.display(), "persisted new state");
+                    last_written = Some(snapshot);
+                }
             }
         }
     });
@@ -376,7 +399,7 @@ fn write_atomic(path: &PathBuf, data: &[u8]) -> Result<(), TimerError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config::{self, Config};
     use std::fs::{self, File};
     use std::io::Write;
     use std::ops::Sub;
@@ -532,6 +555,8 @@ mod tests {
 
     #[test]
     fn load_or_initialize_with_existing_file() {
+        let config = Config::default();
+
         // Set state for this test
         let existing_state_1 = State {
             timer_type: TimerType::Warning,
@@ -545,7 +570,7 @@ mod tests {
         let _guard_1 = TestGuard::new(&existing_state_1);
 
         // With state data persisted, we should see a timer with those values
-        let timer = load_or_initialize().unwrap();
+        let timer = load_or_initialize(&config).unwrap();
 
         // Compare loaded timer against the existing state data that was saved
         assert_eq!(timer.timer_type, existing_state_1.timer_type);
@@ -553,7 +578,7 @@ mod tests {
         let _guard_2 = TestGuard::new(&existing_state_2);
 
         // With state data persisted, we should see a timer with those values
-        let timer = load_or_initialize().unwrap();
+        let timer = load_or_initialize(&config).unwrap();
 
         // Compare loaded timer against the existing state data that was saved
         assert_eq!(timer.timer_type, existing_state_2.timer_type);
@@ -565,7 +590,7 @@ mod tests {
         let config = Config::default();
 
         // With no previous data persisted, we should see a timer with defaults
-        let timer = load_or_initialize().unwrap();
+        let timer = load_or_initialize(&config).unwrap();
 
         let expected = TimerType::Warning;
         let result = timer.timer_type;
@@ -604,7 +629,7 @@ mod tests {
             last_modified: now_wall - 10000,
         });
 
-        let timer = Timer::new().expect("failed to create new timer");
+        let timer = Timer::new(&default_config).expect("failed to create new timer");
 
         let tolerance_secs = 5;
         let expected_range_high =
@@ -638,7 +663,7 @@ mod tests {
             last_modified: now_wall + 1000,
         });
 
-        let timer = Timer::new().expect("failed to create new timer");
+        let timer = Timer::new(&default_config).expect("failed to create new timer");
 
         let tolerance_secs = 5;
         let expected_range_high = chrono::TimeDelta::new((default_config.timer_warning) as i64, 0)
@@ -670,7 +695,7 @@ mod tests {
             last_modified: now_wall,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         config.timer_warning = 2;
         // reset allows injection of (test) config
@@ -711,7 +736,7 @@ mod tests {
             last_modified: now_wall,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         config.timer_warning = 60;
         // reset allows injection of (test) config
@@ -752,7 +777,7 @@ mod tests {
             last_modified: now_wall,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         config.timer_warning = 1;
         // reset allows injection of (test) config
@@ -825,7 +850,7 @@ mod tests {
             last_modified: now_wall,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         config.timer_warning = 1;
         // reset allows injection of (test) config
@@ -883,7 +908,7 @@ mod tests {
             last_modified: now_wall,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         config.timer_warning = 2;
         // reset allows injection of (test) config
@@ -924,7 +949,7 @@ mod tests {
             last_modified: now_wall,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         config.timer_warning = 2;
         // reset allows injection of (test) config
@@ -1018,7 +1043,7 @@ mod tests {
             last_modified: now_wall - 60,
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         let original_start = timer.start;
 
@@ -1064,7 +1089,7 @@ mod tests {
                 .as_secs(),
         });
 
-        let mut timer = Timer::new().expect("failed to create new timer");
+        let mut timer = Timer::new(&config).expect("failed to create new timer");
 
         timer.reset(&config).expect("failed to reset timer");
 
