@@ -291,6 +291,11 @@ async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
         timer
             .update(elapsed, config.timer_dead_man)
             .context("Failed to update timer")?;
+
+        // Drop locks before sleeping
+        drop(timer);
+        drop(config);
+
         sleep(Duration::from_secs(1)).await;
     }
 }
