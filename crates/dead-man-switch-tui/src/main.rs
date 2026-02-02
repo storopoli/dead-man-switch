@@ -1,8 +1,5 @@
 //! TUI implementation for the Dead Man's Switch.
 
-use std::io;
-use std::time::Duration;
-
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -16,11 +13,12 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
     Frame, Terminal,
 };
-use thiserror::Error;
+use std::io::{self, Stdout};
+use std::time::Duration;
 
 use dead_man_switch::{
-    config::{config_path, load_or_initialize_config, ConfigError, Email},
-    email::EmailError,
+    config::{self, Email},
+    error::TuiError,
     timer::{Timer, TimerType},
 };
 
@@ -32,6 +30,46 @@ const ASCII_ART: [&str; 5] = [
     "██   ██ ██      ██   ██ ██   ██     ██  ██  ██ ██   ██ ██  ██ ██      ██          ██ ██ ███ ██ ██    ██    ██      ██   ██",
     "██████  ███████ ██   ██ ██████      ██      ██ ██   ██ ██   ████ ███████     ███████  ███ ███  ██    ██     ██████ ██   ██",
 ];
+
+struct SMTPCheck {
+    enabled: bool,
+    ok: bool,
+}
+
+struct TerminalGuard {
+    terminal: Terminal<CrosstermBackend<Stdout>>,
+}
+
+impl TerminalGuard {
+    fn new() -> Result<Self, TuiError> {
+        // Setup terminal
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let terminal = Terminal::new(backend)?;
+        Ok(Self { terminal })
+    }
+
+    fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<Stdout>> {
+        &mut self.terminal
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        // Restore terminal
+        // ignoring errors and avoiding panics (we're in a drop)
+        let _ = self.terminal.show_cursor();
+        let _ = self.terminal.flush();
+        let _ = execute!(
+            self.terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        );
+        let _ = disable_raw_mode();
+    }
+}
 
 /// Wrapper around [`Timer`].
 struct TuiTimer(Timer);
@@ -78,7 +116,7 @@ impl TuiTimer {
 ///
 /// This function will render the UI.
 /// It's a simple UI with 3 blocks.
-fn ui(f: &mut Frame, config_path: &str, timer: &TuiTimer) {
+fn ui(f: &mut Frame, config_path: &str, smtp_check: &SMTPCheck, timer: &TuiTimer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -99,7 +137,7 @@ fn ui(f: &mut Frame, config_path: &str, timer: &TuiTimer) {
     let ascii_widget = ascii_block(ASCII_ART.as_ref());
     f.render_widget(ascii_widget, chunks[1]);
 
-    let instructions_widget = instructions_block(config_path);
+    let instructions_widget = instructions_block(config_path, smtp_check);
     f.render_widget(instructions_widget, chunks[2]);
 
     let gauge_title = timer.title();
@@ -148,8 +186,8 @@ fn legend_block() -> Paragraph<'static> {
 /// The Instructions block.
 ///
 /// Contains the instructions for the TUI.
-fn instructions_block(config_path: &str) -> Paragraph<'static> {
-    let text = vec![
+fn instructions_block(config_path: &str, smtp_check: &SMTPCheck) -> Paragraph<'static> {
+    let mut text = vec![
         Line::from(vec![
             Span::styled(
                 "1. ",
@@ -198,6 +236,39 @@ fn instructions_block(config_path: &str) -> Paragraph<'static> {
             ),
         ]),
     ];
+
+    if smtp_check.enabled {
+        if !smtp_check.ok {
+            text.push(Line::from(vec![
+                Span::styled(
+                    "❌ ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("SMTP server timeout - Check config", Style::default()),
+            ]));
+        } else {
+            text.push(Line::from(vec![
+                Span::styled(
+                    "✅ ",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("SMTP server verified", Style::default()),
+            ]));
+        }
+    } else {
+        text.push(Line::from(vec![
+            Span::styled(
+                "⚠️ ",
+                Style::default()
+                    .fg(Color::Indexed(214))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("SMTP server verification disabled", Style::default()),
+        ]));
+    }
+
     let block = Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Left)
         .block(Block::default().title("Instructions").borders(Borders::ALL))
@@ -266,54 +337,43 @@ fn timer_block(
         .block(Block::default().title(title).borders(Borders::ALL))
 }
 
-/// TUI Error type.
-#[derive(Error, Debug)]
-enum TuiError {
-    /// IO Error.
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    /// [`ConfigError`] blanket error conversion.
-    #[error(transparent)]
-    Config(#[from] ConfigError),
-    /// [`EmailError`] blanket error conversion.
-    #[error(transparent)]
-    Email(#[from] EmailError),
-}
-
 /// Run the TUI.
 ///
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
 fn run() -> Result<(), TuiError> {
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut guard = TerminalGuard::new()?;
 
-    // Instantiate the Config
-    let config = load_or_initialize_config()?;
-
-    // Get config OS-agnostic path
-    let config_path = config_path()?.to_string_lossy().to_string();
+    // Get the Config data.
+    let config = config::load_or_initialize()?;
+    let config_path = config::file_path()?.to_string_lossy().into_owned();
 
     // Create a new Timer
-    let mut timer = TuiTimer::new(Timer::new(
-        TimerType::Warning,
-        Duration::from_secs(config.timer_warning),
-    ));
+    // Will be initialised from any persisted state, or be set to defaults
+    let mut timer = TuiTimer::new(Timer::new(&config)?);
+
+    let mut smtp_check = SMTPCheck {
+        enabled: config.smtp_check_timeout.is_some_and(|t| t > 0),
+        ok: false,
+    };
+
+    if smtp_check.enabled {
+        // Check SMTP config allows a valid connection
+        smtp_check.ok = config.check_smtp_connection().is_ok();
+    };
 
     // Main loop
     loop {
-        terminal.draw(|f| ui(f, &config_path, &timer))?;
+        guard
+            .terminal_mut()
+            .draw(|f| ui(f, &config_path, &smtp_check, &timer))?;
 
         // Poll for events
         if crossterm::event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,   // Quit
-                    KeyCode::Char('c') => timer.0.reset(&config), // Check-In
+                    KeyCode::Char('q') | KeyCode::Esc => break,    // Quit
+                    KeyCode::Char('c') => timer.0.reset(&config)?, // Check-In
                     _ => {}
                 }
             }
@@ -333,17 +393,8 @@ fn run() -> Result<(), TuiError> {
         }
 
         let elapsed = timer.0.elapsed();
-        timer.0.update(elapsed, config.timer_dead_man);
+        timer.0.update(elapsed, config.timer_dead_man)?;
     }
-
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
 
     Ok(())
 }

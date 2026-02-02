@@ -17,3 +17,4 @@ mime_guess = "2.0.5"
 chrono.workspace = true
 zeroize.workspace = true
 uuid = { version = "1.19.0", features = ["v4"] }
+tracing = "0.1.44"

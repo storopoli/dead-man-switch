@@ -1,7 +1,5 @@
 //! Web implementation for the Dead Man's Switch.
 
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
-
 use anyhow::Context;
 use askama::Template;
 use axum::{
@@ -16,13 +14,14 @@ use axum::{
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar, SameSite};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use dead_man_switch::{
-    config::{load_or_initialize_config, Config, Email},
+    config::{self, Config, Email},
     timer::{Timer, TimerType},
 };
 use jsonwebtoken::{
     decode, encode, errors::Error as JsonTokenError, DecodingKey, EncodingKey, Header, Validation,
 };
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, time::sleep};
 use tokio::{
     runtime::Handle,
@@ -268,7 +267,7 @@ async fn require_auth(
 }
 
 /// Timer loop to check for expired timers and send emails
-async fn main_timer_loop(app_state: Arc<AppState>) {
+async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
     loop {
         let mut timer = app_state.timer.lock().await;
         let config = app_state.config.read().await;
@@ -284,14 +283,31 @@ async fn main_timer_loop(app_state: Arc<AppState>) {
                     if let Err(e) = config.send_email(Email::DeadMan) {
                         error!(?e, "failed to send dead man email");
                     }
-                    break;
+                    return Ok(());
                 }
             }
         }
         let elapsed = timer.elapsed();
-        timer.update(elapsed, config.timer_dead_man);
+        timer
+            .update(elapsed, config.timer_dead_man)
+            .context("Failed to update timer")?;
+
+        // Drop locks before sleeping
+        drop(timer);
+        drop(config);
+
         sleep(Duration::from_secs(1)).await;
     }
+}
+
+// Handle favicon request
+async fn handle_favicon() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
+}
+
+// Handle health endpoint
+async fn handle_health() -> impl IntoResponse {
+    "OK"
 }
 
 /// Shows the login page or redirects to dashboard if already authenticated.
@@ -373,7 +389,7 @@ async fn handle_login(
 /// Handles the logout.
 async fn handle_logout(jar: PrivateCookieJar) -> impl IntoResponse {
     let updated_jar = jar.remove(Cookie::from("jwt"));
-    info!("user logged out");
+    info!("User logged out from web interface");
     (updated_jar, Redirect::to("/"))
 }
 
@@ -408,9 +424,15 @@ async fn handle_check_in(
 ) -> impl IntoResponse {
     let config = state.app_state.config.read().await;
     let mut timer = state.app_state.timer.lock().await;
-    timer.reset(&config);
-    info!("check-in using web interface");
-    Redirect::to("/dashboard")
+    if let Err(e) = timer.reset(&config) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error resetting timer: {}", e),
+        )
+            .into_response();
+    }
+    info!("User checked-in from web interface");
+    Redirect::to("/dashboard").into_response()
 }
 
 /// Endpoint to serve the current timer data in JSON
@@ -434,8 +456,8 @@ async fn timer_data(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Instantiate the Config
-    let config = load_or_initialize_config().context("Failed to load or initialize config")?;
+    // Get the Config data.
+    let config = config::load_or_initialize().map_err(|e| anyhow::anyhow!(e))?;
 
     // Set up logging
     let log_level = config
@@ -447,6 +469,21 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
     subscriber::set_global_default(subscriber)
         .map_err(|e| anyhow::anyhow!("Setting default subscriber failed: {}", e))?;
+
+    // Create a new Timer
+    // Will be initialised from any persisted state, or be set to defaults
+    let timer = Timer::new(&config).map_err(|e| anyhow::anyhow!(e))?;
+
+    if config.smtp_check_timeout.is_some_and(|t| t > 0) {
+        let smtp_ok = config.check_smtp_connection().is_ok();
+        if smtp_ok {
+            info!("SMTP server verified");
+        } else {
+            error!("SMTP server timeout - Check config");
+        }
+    } else {
+        warn!("SMTP server verification disabled");
+    }
 
     // Hash the password
     let password = config.web_password.clone();
@@ -463,11 +500,6 @@ async fn main() -> anyhow::Result<()> {
         jwt_secret,
     });
 
-    // Create a new Timer
-    let timer = Timer::new(
-        TimerType::Warning,
-        Duration::from_secs(config.timer_warning),
-    );
     let app_state = Arc::new(AppState {
         config: RwLock::new(config),
         timer: Mutex::new(timer),
@@ -495,6 +527,8 @@ async fn main() -> anyhow::Result<()> {
     // Public routes
     let public_routes = Router::new()
         .route("/", get(show_login).post(handle_login))
+        .route("/favicon.ico", get(handle_favicon))
+        .route("/health", get(handle_health))
         .route("/logout", post(handle_logout));
 
     // Combine routes and apply auth middleware to all
@@ -521,7 +555,11 @@ async fn main() -> anyhow::Result<()> {
         .with_state(shared_state);
 
     // Main loop for the timer
-    tokio::spawn(main_timer_loop(app_state));
+    tokio::spawn(async move {
+        if let Err(e) = main_timer_loop(app_state).await {
+            error!(?e, "main timer loop failed");
+        }
+    });
 
     // Run app with axum, listening globally on port 3000
     let port = 3000_u16;
