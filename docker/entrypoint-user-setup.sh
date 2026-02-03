@@ -21,8 +21,7 @@ fi
 mkdir -p "${HOME}"
 
 # Ensure correct ownership - exclude well known files (that may be read-only bind mounted)
-find "${HOME}" -xdev \( -type f -name config.toml \) -prune -o \
-  -exec chown -h "${PUID}:${PGID}" {} +
+find "${HOME}" \( -name config.toml \) -o -exec chown -h "${PUID}:${PGID}" {} +
 
 # Optional: Print configuration details
 if [ "${PRINT_USER_CONFIG}" = "true" ]; then
