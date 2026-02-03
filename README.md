@@ -124,7 +124,8 @@ To use the web interface, please follow the instructions below:
 1. Change the configuration template file with your own values:
 
    ```bash
-   cp config.example.toml config.toml
+   mkdir my-config-dir
+   cp config.example.toml my-config-dir/config.toml
    ```
 
 1. Copy the Docker Compose example file:
