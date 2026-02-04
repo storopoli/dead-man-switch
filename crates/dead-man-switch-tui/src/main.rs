@@ -176,11 +176,11 @@ fn legend_block() -> Paragraph<'static> {
         ),
         Span::raw(":Quit"),
     ])];
-    let block = Paragraph::new(text)
+
+    Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Center)
         .block(Block::default().title("Keys").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    block
+        .wrap(Wrap { trim: true })
 }
 
 /// The Instructions block.
@@ -265,11 +265,10 @@ fn instructions_block(config_path: &str, smtp_check: &SMTPCheck) -> Paragraph<'s
         ]));
     }
 
-    let block = Paragraph::new(text)
+    Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Left)
         .block(Block::default().title("Instructions").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    block
+        .wrap(Wrap { trim: true })
 }
 
 /// The ASCII block.
@@ -288,11 +287,10 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
         })
         .collect();
 
-    let block = Paragraph::new(text)
+    Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Center)
         .block(Block::default().title("").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    block
+        .wrap(Wrap { trim: true })
 }
 
 /// The timer block.
