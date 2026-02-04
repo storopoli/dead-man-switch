@@ -1,17 +1,17 @@
 //! TUI implementation for the Dead Man's Switch.
 
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use ratatui_crossterm::crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use std::io::{self, Stdout};
 use std::time::Duration;
@@ -211,18 +211,14 @@ fn instructions_block(config_path: &str, smtp_check: &SMTPCheck) -> Paragraph<'s
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw(
-                "Check-In with ",
-            ),
+            Span::raw("Check-In with "),
             Span::styled(
                 "c",
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw(
-                " within the warning time.",
-            ),
+            Span::raw(" within the warning time."),
         ]),
         Line::from(vec![
             Span::styled(

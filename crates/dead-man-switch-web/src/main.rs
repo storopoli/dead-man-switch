@@ -3,22 +3,23 @@
 use anyhow::Context;
 use askama::Template;
 use axum::{
+    BoxError, Extension, Json, Router,
     error_handling::HandleErrorLayer,
     extract::{Form, FromRef, Request, State},
     http::{Method, StatusCode},
     middleware::{self, Next},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
-    serve, BoxError, Extension, Json, Router,
+    serve,
 };
 use axum_extra::extract::cookie::{Cookie, Key, PrivateCookieJar, SameSite};
-use bcrypt::{hash, verify, DEFAULT_COST};
+use bcrypt::{DEFAULT_COST, hash, verify};
 use dead_man_switch::{
     config::{self, Config, Email},
     timer::{Timer, TimerType},
 };
 use jsonwebtoken::{
-    decode, encode, errors::Error as JsonTokenError, DecodingKey, EncodingKey, Header, Validation,
+    DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::Error as JsonTokenError,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
@@ -27,12 +28,12 @@ use tokio::{
     runtime::Handle,
     sync::{Mutex, RwLock},
 };
-use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
+use tower::{ServiceBuilder, buffer::BufferLayer, limit::RateLimitLayer};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
-use tracing::{error, info, subscriber, warn, Level};
+use tracing::{Level, error, info, subscriber, warn};
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};

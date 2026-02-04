@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{mpsc, OnceLock};
+use std::sync::{OnceLock, mpsc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tracing::{error, trace, warn};
@@ -490,9 +490,11 @@ mod tests {
 
         // It should also of course contain the actual file name
         let expected = Path::new(app::name()).join(file_name());
-        assert!(result
-            .to_string_lossy()
-            .contains(expected.to_string_lossy().as_ref()));
+        assert!(
+            result
+                .to_string_lossy()
+                .contains(expected.to_string_lossy().as_ref())
+        );
 
         // Cleanup any created directories
         cleanup_test_dir_parent(&result);
