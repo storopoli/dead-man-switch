@@ -8,3 +8,4 @@ result/
 .pre-commit-config.yaml
 
 .DS_Store
+my-config-dir

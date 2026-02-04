@@ -1,13 +1,18 @@
+# CARGO_PACKAGE: Cargo package to build
+ARG CARGO_PACKAGE=dead-man-switch-tui
+# ENTRYPOINT_FILE: Entrypoint file to use
+ARG ENTRYPOINT_FILE=entrypoint-cli.sh
+
+############################################################
+#                        builder
+############################################################
 # Start from the official Rust image
 FROM rust:latest AS builder
 
+ARG CARGO_PACKAGE
+
 # Set the working directory
 WORKDIR /usr/src/app
-
-# Add labels for OCI annotations
-LABEL org.opencontainers.image.source="https://github.com/storopoli/dead-man-switch" \
-    org.opencontainers.image.description="Dead Man's Switch" \
-    org.opencontainers.image.licenses="AGPLv3"
 
 # Copy project's source
 COPY ./Cargo.toml ./
@@ -15,27 +20,42 @@ COPY ./Cargo.lock ./
 COPY ./crates ./crates
 
 # Build application for release target
-RUN cargo build -p dead-man-switch-tui --release
+RUN cargo build -p ${CARGO_PACKAGE} --release
 
+############################################################
+#                     final image
+############################################################
 # Start a new stage from a slim version of Debian to reduce the size of the final image
-FROM debian:trixie-slim
+FROM debian:trixie-slim AS final
+
+ARG CARGO_PACKAGE
+ARG ENTRYPOINT_FILE
+
+# Add labels for OCI annotations
+LABEL org.opencontainers.image.source="https://github.com/storopoli/dead-man-switch" \
+  org.opencontainers.image.description="Dead Man's Switch" \
+  org.opencontainers.image.licenses="AGPLv3"
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install libssl3
-RUN apt-get update && apt-get install -y libssl3 && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libssl3 \
+ && apt clean \
+ && rm -rf /var/lib/apt/lists/*
 
 # Copy binaries from builder
-COPY --from=builder /usr/src/app/target/release/dead-man-switch-tui /usr/local/bin/dead-man-switch-tui
-
-# create non-root user
-RUN useradd -r -u 1000 -m -d /home/dms dms \
- && chown -R dms:dms /usr/local/bin/dead-man-switch-tui /home/dms
-ENV HOME=/home/dms
-USER 1000
-
-WORKDIR /home/dms/
-
-# Create config directory
-RUN mkdir -p /home/dms/.config/deadman
+COPY --from=builder /usr/src/app/target/release/${CARGO_PACKAGE} /usr/local/bin/dead-man-switch
 
 # Command to run the binary
-CMD ["/usr/local/bin/dead-man-switch-tui"]
+CMD ["/usr/local/bin/dead-man-switch"]
+
+# Copy entrypoint script(s)
+COPY docker/entrypoint-user-setup.sh /usr/local/bin/entrypoint-user-setup.sh
+RUN chmod +x /usr/local/bin/entrypoint-user-setup.sh
+COPY docker/${ENTRYPOINT_FILE} /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+STOPSIGNAL SIGTERM

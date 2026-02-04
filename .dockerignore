@@ -1,0 +1,9 @@
+# Ignore everything by default
+*
+
+# Explicitly allow
+!docker/
+!docker/**
+!crates/
+!crates/**
+!Cargo.*
