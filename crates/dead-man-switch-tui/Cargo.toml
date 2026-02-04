@@ -1,6 +1,6 @@
 [package]
 name = "dead-man-switch-tui"
-edition = "2021"
+edition.workspace = true
 version.workspace = true
 authors.workspace = true
 description = "A simple no-BS Dead Man's Switch Tui Interface"
