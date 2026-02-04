@@ -1,6 +1,6 @@
 [package]
 name = "dead-man-switch-web"
-edition = "2021"
+edition.workspace = true
 version.workspace = true
 authors.workspace = true
 description = "A simple no-BS Dead Man's Switch Web Interface"
@@ -24,7 +24,7 @@ tracing-subscriber = "0.3.22"
 # Auth handling
 axum-extra = { version = "0.12.2", features = ["cookie", "cookie-private"] }
 bcrypt = "0.17.1"
-jsonwebtoken = "9.3.1"
+jsonwebtoken = "10.3.0"
 uuid = { version = "1.19.0", features = ["v4", "serde"] }
 chrono = { workspace = true, features = ["serde"] }
 
