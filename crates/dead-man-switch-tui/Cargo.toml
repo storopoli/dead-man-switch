@@ -11,5 +11,5 @@ readme = "../../README.md"
 dead-man-switch.workspace = true
 
 thiserror = "2.0.18"
-ratatui = "0.29.0"
-crossterm = "0.29.0"
+ratatui = "0.30.0"
+ratatui-crossterm = "0.1.0"
