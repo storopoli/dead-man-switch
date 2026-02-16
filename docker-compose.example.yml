@@ -9,8 +9,8 @@ services:
       - PGID=10000
       - PRINT_USER_CONFIG=true
     volumes:
-      # path-to-config-dir:/home/dms/.config/deadman/
-      - "./my-config-dir/:/home/dms/.config/deadman/"
+      # path-to-config-dir:/config
+      - "./my-config-dir:/config"
 
       # Optionally, specify config.toml as read-only
-      # - "./my-config-dir/config.toml:/home/dms/.config/deadman/config.toml:ro"
+      # - "./my-config-dir/config.toml:/config/config.toml:ro"
