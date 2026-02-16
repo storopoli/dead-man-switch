@@ -1,0 +1,64 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+PUID=${PUID:-911}
+PGID=${PGID:-911}
+
+if [[ -z ${LSIO_READ_ONLY_FS} ]] && [[ -z ${LSIO_NON_ROOT_USER} ]]; then
+    # USERHOME=$(grep abc /etc/passwd | cut -d ":" -f6)
+    # ^ linuxserver's default is /config
+    # we need a proper home dir for the app so we can use /config for, er, config (not a home dir)
+    USERHOME="/app"
+
+    # setup a link from /config to where the app is expecting it's "config" to be located
+    mkdir -p "${USERHOME}/.config"
+    ln -sf /config "${USERHOME}/.config/deadman"
+
+    groupmod -o -g "${PGID}" abc
+    usermod -o -u "${PUID}" abc
+
+    usermod -d "${USERHOME}" abc
+fi
+
+if { [[ -z ${LSIO_READ_ONLY_FS} ]] && [[ -z ${LSIO_NON_ROOT_USER} ]]; } || [[ ! ${LSIO_FIRST_PARTY} = "true" ]]; then
+    echo ""
+    cat /etc/s6-overlay/s6-rc.d/init-adduser/branding
+else
+    cat /run/branding
+fi
+
+# if [[ -f /donate.txt ]]; then
+#     echo '
+# To support the app dev(s) visit:'
+#     cat /donate.txt
+# fi
+
+echo '
+───────────────────────────────────────
+GID/UID
+───────────────────────────────────────'
+
+if [[ -z ${LSIO_NON_ROOT_USER} ]]; then
+echo "
+User UID:    $(id -u abc)
+User GID:    $(id -g abc)
+───────────────────────────────────────"
+else
+echo "
+User UID:    $(stat /run -c %u)
+User GID:    $(stat /run -c %g)
+───────────────────────────────────────"
+fi
+
+# if [[ -f /build_version ]]; then
+#     cat /build_version
+#     echo '
+# ───────────────────────────────────────
+#     '
+# fi
+
+if [[ -z ${LSIO_READ_ONLY_FS} ]] && [[ -z ${LSIO_NON_ROOT_USER} ]]; then
+    lsiown abc:abc /app
+    lsiown abc:abc /config
+    lsiown abc:abc /defaults
+fi

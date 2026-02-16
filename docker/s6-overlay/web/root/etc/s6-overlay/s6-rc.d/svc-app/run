@@ -1,0 +1,8 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# Get HOME for the abc user
+HOME=$(grep abc /etc/passwd | cut -d ":" -f6)
+
+# echo "Starting app as user: $(id abc)"
+s6-setuidgid abc /usr/local/bin/app
