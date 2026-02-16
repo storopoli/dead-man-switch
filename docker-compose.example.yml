@@ -7,7 +7,6 @@ services:
       # Optional environment variables
       - PUID=1000
       - PGID=10000
-      - PRINT_USER_CONFIG=true
     volumes:
       # path-to-config-dir:/config
       - "./my-config-dir:/config"
