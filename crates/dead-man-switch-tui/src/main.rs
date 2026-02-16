@@ -1,17 +1,17 @@
 //! TUI implementation for the Dead Man's Switch.
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph, Wrap},
-    Frame, Terminal,
+};
+use ratatui_crossterm::crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use std::io::{self, Stdout};
 use std::time::Duration;
@@ -176,11 +176,11 @@ fn legend_block() -> Paragraph<'static> {
         ),
         Span::raw(":Quit"),
     ])];
-    let block = Paragraph::new(text)
+
+    Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Center)
         .block(Block::default().title("Keys").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    block
+        .wrap(Wrap { trim: true })
 }
 
 /// The Instructions block.
@@ -211,18 +211,14 @@ fn instructions_block(config_path: &str, smtp_check: &SMTPCheck) -> Paragraph<'s
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw(
-                "Check-In with ",
-            ),
+            Span::raw("Check-In with "),
             Span::styled(
                 "c",
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw(
-                " within the warning time.",
-            ),
+            Span::raw(" within the warning time."),
         ]),
         Line::from(vec![
             Span::styled(
@@ -269,11 +265,10 @@ fn instructions_block(config_path: &str, smtp_check: &SMTPCheck) -> Paragraph<'s
         ]));
     }
 
-    let block = Paragraph::new(text)
+    Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Left)
         .block(Block::default().title("Instructions").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    block
+        .wrap(Wrap { trim: true })
 }
 
 /// The ASCII block.
@@ -292,11 +287,10 @@ fn ascii_block(content: &[&'static str]) -> Paragraph<'static> {
         })
         .collect();
 
-    let block = Paragraph::new(text)
+    Paragraph::new(text)
         .alignment(ratatui::layout::Alignment::Center)
         .block(Block::default().title("").borders(Borders::ALL))
-        .wrap(Wrap { trim: true });
-    block
+        .wrap(Wrap { trim: true })
 }
 
 /// The timer block.
@@ -369,7 +363,7 @@ fn run() -> Result<(), TuiError> {
             .draw(|f| ui(f, &config_path, &smtp_check, &timer))?;
 
         // Poll for events
-        if crossterm::event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => break,    // Quit

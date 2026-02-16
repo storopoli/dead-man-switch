@@ -1,21 +1,21 @@
 //! Email sending capabilities of the Dead Man's Switch.
 
-use crate::config::{attachment_path, Config, Email};
+use crate::config::{Config, Email, attachment_path};
 use crate::error::{AddressError, EmailError};
 
 use lettre::{
-    message::{header::ContentType, Attachment, Mailbox, MultiPart, SinglePart},
+    Message, SmtpTransport, Transport,
+    message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType},
     transport::smtp::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    Message, SmtpTransport, Transport,
 };
 use std::fs;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
