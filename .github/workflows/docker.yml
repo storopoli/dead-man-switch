@@ -20,22 +20,32 @@ jobs:
           persist-credentials: false
 
       - name: Build Docker image
-        run: docker build -f Dockerfile-web -t dead_man_switch-web .
+        run: docker build . -f docker/web/Dockerfile -t dead_man_switch-web
 
       - name: Run Docker
-        run: docker run -d --name dead_man_switch-web -p 3000:3000 dead_man_switch-web
+        run: docker run --rm -d --name dead_man_switch-web -p 3000:3000 dead_man_switch-web
 
       - name: Test Docker
         run: |
-          sleep 10 # sleep for 10 seconds to allow the server to start
+          sleep 10 # sleep for 10 seconds to allow the container to start (and be stable)
+          if [ "$(docker inspect -f '{{.State.Status}}' dead_man_switch-web)" != "running" ]; then
+            echo "Web container is not running"
+            exit 1
+          fi
+          echo "Web container launched successfully"
+
           response=$(curl -s -o /dev/null -w "%{http_code}" localhost:3000/timer)
           if [ "$response" -ne 303 ]; then
               echo "Expected SEE OTHER (REDIRECT) error, but got $response"
               exit 1
           fi
+          echo "Web container responded successfully"
 
       - name: Display Docker container logs
         run: docker logs dead_man_switch-web
+
+      - name: Teardown
+        run: docker rm -f dead_man_switch-web
 
   build-cli:
     runs-on: ubuntu-latest
@@ -47,10 +57,25 @@ jobs:
           persist-credentials: false
 
       - name: Build Docker image
-        run: docker build -f Dockerfile-cli -t dead_man_switch-cli .
+        run: docker build . -f docker/cli/Dockerfile -t dead_man_switch-cli
 
       - name: Run Docker
-        run: docker run -d --name dead_man_switch-cli dead_man_switch-cli
+        run: docker run --rm -it -d --name dead_man_switch-cli dead_man_switch-cli
 
       - name: Display Docker container logs
         run: docker logs dead_man_switch-cli
+
+      - name: Test Docker
+        run: |
+          sleep 10 # sleep for 10 seconds to allow the container to start (and be stable)
+          if [ "$(docker inspect -f '{{.State.Status}}' dead_man_switch-cli)" != "running" ]; then
+            echo "Cli container is not running"
+            exit 1
+          fi
+          echo "Cli container launched successfully"
+
+      - name: Display Docker container logs
+        run: docker logs dead_man_switch-cli
+
+      - name: Teardown
+        run: docker rm -f dead_man_switch-cli

@@ -1,0 +1,12 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+if [ "${PUID}" = "0" ] || [ "${PGID}" = "0" ]; then
+    echo "ERROR: PUID or PGID cannot be 0, for security reasons!"
+    echo "Current values: PUID=${PUID}, PGID=${PGID}"
+    echo "Please ensure both have non-root IDs (e.g., PUID=1000 PGID=1000)"
+    echo "(will attempt shutting down container in 3 seconds)"
+    sleep 3
+    s6-svscanctl -t /run/service
+    exit 1
+fi

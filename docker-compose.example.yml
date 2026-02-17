@@ -3,5 +3,13 @@ services:
     image: ghcr.io/storopoli/dead_man_switch-web:latest
     ports:
       - "3000:3000"
+    environment:
+      # Optional environment variables
+      - PUID=1000
+      - PGID=10000
     volumes:
-      - "./config.toml:/home/dms/.config/deadman/config.toml"
+      # path-to-config-dir:/config
+      - "./my-config-dir:/config"
+
+      # Optionally, specify config.toml as read-only
+      # - "./my-config-dir/config.toml:/config/config.toml:ro"

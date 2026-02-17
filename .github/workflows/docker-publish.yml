@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: Build image
-        run: docker build . --file Dockerfile-web --tag $IMAGE_NAME_WEB --label "runnumber=${GITHUB_RUN_ID}"
+        run: docker build . --file docker/web/Dockerfile --tag $IMAGE_NAME_WEB --label "runnumber=${GITHUB_RUN_ID}"
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
@@ -74,7 +74,7 @@ jobs:
           persist-credentials: false
 
       - name: Build image
-        run: docker build . --file Dockerfile-cli --tag $IMAGE_NAME_CLI --label "runnumber=${GITHUB_RUN_ID}"
+        run: docker build . --file docker/cli/Dockerfile --tag $IMAGE_NAME_CLI --label "runnumber=${GITHUB_RUN_ID}"
 
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin

@@ -1,0 +1,14 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# Get HOME for the abc user
+HOME=$(grep abc /etc/passwd | cut -d ":" -f6)
+
+# echo "Starting app as user: $(id abc)"
+s6-setuidgid abc /usr/local/bin/app
+
+# Clear screen on exit
+clear 2>/dev/null || true
+
+echo "Application exited, shutting down container..."
+/run/s6/basedir/bin/halt
