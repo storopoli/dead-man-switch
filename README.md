@@ -110,7 +110,7 @@ To do so you can add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dead-man-switch = "0.9.1"
+dead-man-switch = "0.9.2"
 ```
 
 ## Web Interface
