@@ -131,32 +131,32 @@ impl Config {
                 });
 
         // Conditionally add the attachment for DeadMan email type
-        if let Email::DeadMan = email_type {
-            if let Some(attachment) = &self.attachment {
-                let attachment_path = attachment_path(self)?;
-                let filename = attachment_path
-                    .file_name()
-                    .ok_or_else(|| IoError::new(IoErrorKind::NotFound, "Failed to get filename"))?
-                    .to_string_lossy();
-                let filebody = fs::read(attachment)?;
-                let content_type = ContentType::parse(
-                    mime_guess::from_path(attachment)
-                        .first_or_octet_stream()
-                        .as_ref(),
-                )?;
+        if let Email::DeadMan = email_type
+            && let Some(attachment) = &self.attachment
+        {
+            let attachment_path = attachment_path(self)?;
+            let filename = attachment_path
+                .file_name()
+                .ok_or_else(|| IoError::new(IoErrorKind::NotFound, "Failed to get filename"))?
+                .to_string_lossy();
+            let filebody = fs::read(attachment)?;
+            let content_type = ContentType::parse(
+                mime_guess::from_path(attachment)
+                    .first_or_octet_stream()
+                    .as_ref(),
+            )?;
 
-                // Create the attachment part
-                let attachment_part =
-                    Attachment::new(filename.to_string()).body(filebody, content_type);
+            // Create the attachment part
+            let attachment_part =
+                Attachment::new(filename.to_string()).body(filebody, content_type);
 
-                // Construct and return the email with the attachment
-                let email = email_builder.multipart(
-                    MultiPart::mixed()
-                        .singlepart(text_part)
-                        .singlepart(attachment_part),
-                )?;
-                return Ok(email);
-            }
+            // Construct and return the email with the attachment
+            let email = email_builder.multipart(
+                MultiPart::mixed()
+                    .singlepart(text_part)
+                    .singlepart(attachment_part),
+            )?;
+            return Ok(email);
         }
 
         // For Warning email type or DeadMan without an attachment

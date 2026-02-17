@@ -363,13 +363,13 @@ fn run() -> Result<(), TuiError> {
             .draw(|f| ui(f, &config_path, &smtp_check, &timer))?;
 
         // Poll for events
-        if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,    // Quit
-                    KeyCode::Char('c') => timer.0.reset(&config)?, // Check-In
-                    _ => {}
-                }
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => break,    // Quit
+                KeyCode::Char('c') => timer.0.reset(&config)?, // Check-In
+                _ => {}
             }
         }
 

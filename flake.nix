@@ -32,7 +32,7 @@
 
         pkgs = import nixpkgs { inherit system overlays; };
 
-        msrv = pkgs.rust-bin.stable."1.86.0".default;
+        msrv = pkgs.rust-bin.stable."1.88.0".default;
 
         package_version = "0.9.1";
 
