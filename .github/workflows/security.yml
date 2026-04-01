@@ -23,14 +23,7 @@ jobs:
         with:
           persist-credentials: false
 
-<<<<<<< rustsec-rsa
       - name: Run security audit
         uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-=======
-      - name: Setup Rust
-        run: rustup show
-
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
->>>>>>> main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
