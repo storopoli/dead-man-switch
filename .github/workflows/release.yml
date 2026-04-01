@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        run: rustup show
 
       - name: Publish to Crates.io - Library
         run: cargo publish -p dead-man-switch
