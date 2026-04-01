@@ -20,11 +20,12 @@ jobs:
           persist-credentials: false
 
       - name: Upload binary to release
-        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1
+        run: gh release create
 
   cratesio:
     name: Publish Release to Crates.io
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -32,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        run: rustup show
 
       - name: Publish to Crates.io - Library
         run: cargo publish -p dead-man-switch
