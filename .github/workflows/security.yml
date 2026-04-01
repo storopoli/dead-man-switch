@@ -9,7 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-permissions: {}
+permissions:
+  checks: write
+  contents: read
 
 jobs:
   supply-chain:
@@ -21,19 +23,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust
-        run: rustup show
-
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+      - name: Run security audit
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
-          cache-on-failure: true
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --force --locked
-
-      - name: Check for audit warnings
-        run: cargo audit -D warnings
-        continue-on-error: true
-
-      - name: Check for vulnerabilities
-        run: cargo audit
+          token: ${{ secrets.GITHUB_TOKEN }}

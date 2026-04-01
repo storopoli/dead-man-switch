@@ -1,0 +1,6 @@
+[advisories]
+ignore = [
+  # rsa 0.9.10 Marvin Attack: potential key recovery through timing sidechannels
+  # no fixed upgpradeade available.
+  "RUSTSEC-2023-0071",
+]
