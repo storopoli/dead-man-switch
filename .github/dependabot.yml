@@ -14,6 +14,13 @@ updates:
     # Cooldown
     cooldown:
       default-days: 14
+  - package-ecosystem: "nix"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Cooldown
+    cooldown:
+      default-days: 14
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
