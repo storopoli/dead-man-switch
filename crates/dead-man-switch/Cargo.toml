@@ -12,7 +12,7 @@ thiserror = "2.0.18"
 serde = { version = "1.0.228", features = ["derive"] }
 toml = "1.1.0"
 directories-next = "2.0.0"
-lettre = { version = "0.11.18", features = ["rustls-tls", "builder"] }
+lettre = { version = "0.11.21", features = ["rustls-tls", "builder"] }
 mime_guess = "2.0.5"
 chrono.workspace = true
 zeroize.workspace = true
