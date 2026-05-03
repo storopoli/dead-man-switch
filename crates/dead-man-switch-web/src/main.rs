@@ -366,12 +366,17 @@ async fn handle_login(
     };
 
     if is_valid {
+        let config = state.app_state.config.read().await;
+        let cookie_exp_hours = i64::try_from(config.cookie_exp_days)
+            .unwrap_or(i64::MAX)
+            .saturating_mul(24);
+
         // Create JWT claims
-        let claims = Claims::new("user".to_string(), 24); // 24 hour expiry
+        let claims = Claims::new("user".to_string(), cookie_exp_hours);
 
         match generate_jwt(&state.secret_data.jwt_secret, claims) {
             Ok(token) => {
-                let secure_cookie = create_secure_cookie("jwt", token, 24);
+                let secure_cookie = create_secure_cookie("jwt", token, cookie_exp_hours);
                 let updated_jar = jar.add(secure_cookie);
                 info!("User successfully authenticated");
                 (updated_jar, Redirect::to("/dashboard")).into_response()
