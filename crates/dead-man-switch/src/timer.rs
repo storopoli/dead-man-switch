@@ -197,21 +197,37 @@ pub fn load_or_initialize(config: &Config) -> Result<Timer, TimerError> {
                 Ok(state) => {
                     // persistence file OK - setup timer based on persisted state
                     let wall_elapsed = wall_elapsed(state.last_modified);
+                    let warning_duration = Duration::from_secs(config.timer_warning);
+                    let dead_man_duration = Duration::from_secs(config.timer_dead_man);
+
                     // Build a monotonic start Instant such that
-                    // Instant::now() - start == wall_elapsed,
+                    // Instant::now() - start == effective_elapsed,
                     // but guard against underflow using checked_sub.
                     let now_mono = Instant::now();
-                    let start = match now_mono.checked_sub(wall_elapsed) {
+                    let (timer_type, duration, effective_elapsed) = match state.timer_type {
+                        TimerType::Warning if wall_elapsed >= warning_duration => {
+                            let dead_man_elapsed = wall_elapsed.saturating_sub(warning_duration);
+                            (
+                                TimerType::DeadMan,
+                                dead_man_duration,
+                                dead_man_elapsed.min(dead_man_duration),
+                            )
+                        }
+                        TimerType::Warning => (TimerType::Warning, warning_duration, wall_elapsed),
+                        TimerType::DeadMan => (
+                            TimerType::DeadMan,
+                            dead_man_duration,
+                            wall_elapsed.min(dead_man_duration),
+                        ),
+                    };
+                    let start = match now_mono.checked_sub(effective_elapsed) {
                         Some(s) => s,
                         None => now_mono, // clamp to zero elapsed
                     };
                     let timer = Timer {
-                        timer_type: state.timer_type,
+                        timer_type,
                         start,
-                        duration: match state.timer_type {
-                            TimerType::Warning => Duration::from_secs(config.timer_warning),
-                            TimerType::DeadMan => Duration::from_secs(config.timer_dead_man),
-                        },
+                        duration,
                     };
                     (timer, state)
                 }
@@ -560,13 +576,14 @@ mod tests {
         let config = Config::default();
 
         // Set state for this test
+        let now_wall = system_time_epoch().unwrap().as_secs();
         let existing_state_1 = State {
             timer_type: TimerType::Warning,
-            last_modified: 3,
+            last_modified: now_wall,
         };
         let existing_state_2 = State {
             timer_type: TimerType::DeadMan,
-            last_modified: 4,
+            last_modified: now_wall,
         };
 
         let _guard_1 = TestGuard::new(&existing_state_1);
@@ -584,6 +601,24 @@ mod tests {
 
         // Compare loaded timer against the existing state data that was saved
         assert_eq!(timer.timer_type, existing_state_2.timer_type);
+    }
+
+
+    #[test]
+    fn load_or_initialize_carries_elapsed_warning_time_into_dead_man() {
+        let mut config = Config::default();
+        config.timer_warning = 10;
+        config.timer_dead_man = 5;
+
+        let now_wall = system_time_epoch().unwrap().as_secs();
+        let _guard = TestGuard::new(&State {
+            timer_type: TimerType::Warning,
+            last_modified: now_wall - 20,
+        });
+
+        let timer = load_or_initialize(&config).unwrap();
+        assert_eq!(timer.get_type(), TimerType::DeadMan);
+        assert!(timer.expired());
     }
 
     #[test]
