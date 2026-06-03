@@ -23,7 +23,7 @@ tracing-subscriber = "0.3.23"
 
 # Auth handling
 axum-extra = { version = "0.12.5", features = ["cookie", "cookie-private"] }
-bcrypt = "0.19.0"
+bcrypt = "0.19.1"
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 uuid = { version = "1.23.1", features = ["v4", "serde"] }
 chrono = { workspace = true, features = ["serde"] }
