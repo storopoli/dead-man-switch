@@ -17,12 +17,17 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 use dead_man_switch::{
     config::{self, Config, Email},
     timer::{Timer, TimerType},
+    tor::{self, DmsTorClient, OnionEndpoint},
 };
+use futures::StreamExt;
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server::conn::auto::Builder as HyperBuilder;
+use hyper_util::service::TowerToHyperService;
 use jsonwebtoken::{
     DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::Error as JsonTokenError,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, time::sleep};
 use tokio::{
     runtime::Handle,
@@ -43,6 +48,10 @@ struct AppState {
     /// Dead Man's Switch [`Config`].
     config: RwLock<Config>,
     timer: Mutex<Timer>,
+    /// Bootstrapped Tor client, shared by the onion service and outbound email.
+    ///
+    /// `None` until/unless Tor is enabled and has finished bootstrapping.
+    tor_client: RwLock<Option<Arc<DmsTorClient>>>,
 }
 
 /// Secret data to be zeroized.
@@ -160,6 +169,24 @@ struct SharedState {
     secret_data: Arc<SecretData>,
     /// Secret key for cookie encryption.
     key: SecureKey,
+    /// Current `.onion` address, once the onion service publishes it.
+    tor_address: Arc<RwLock<Option<String>>>,
+    /// Current runtime status of the Tor subsystem.
+    tor_status: Arc<RwLock<TorStatus>>,
+}
+
+/// Runtime status of the Tor subsystem, surfaced by `/api/tor`.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum TorStatus {
+    /// Tor is disabled in the configuration.
+    Disabled,
+    /// Bootstrapping the Tor client (or retrying after a failure).
+    Bootstrapping,
+    /// Tor client is up and the onion service is serving.
+    Running,
+    /// Bootstrapping the Tor client failed; retrying in the background.
+    Failed,
 }
 
 /// Tells [`PrivateCookieJar`] how to access the key from a [`SharedState`].
@@ -267,35 +294,94 @@ async fn require_auth(
     next.run(request).await
 }
 
+/// Maximum time to wait for a single email send before giving up and retrying.
+const EMAIL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Backoff between retries of a failed DeadMan send (the loop's terminal state).
+const DEAD_MAN_RETRY_BACKOFF: Duration = Duration::from_secs(15);
+
+/// Send an email with an overall timeout so a hung SMTP/Tor connection cannot
+/// stall the timer loop indefinitely.
+async fn send_email_with_timeout(
+    config: &Config,
+    tor_client: Option<&DmsTorClient>,
+    email_type: Email,
+) -> anyhow::Result<()> {
+    match tokio::time::timeout(
+        EMAIL_SEND_TIMEOUT,
+        config.send_email_maybe_tor(tor_client, email_type),
+    )
+    .await
+    {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(anyhow::anyhow!(e)),
+        Err(_) => Err(anyhow::anyhow!("email send timed out")),
+    }
+}
+
 /// Timer loop to check for expired timers and send emails
 async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
     loop {
-        let mut timer = app_state.timer.lock().await;
-        let config = app_state.config.read().await;
-        // Check timer expiration
-        if timer.expired() {
-            match timer.get_type() {
+        // Clone the config and Tor client handle so we never hold a lock guard
+        // across the `.await` on the (potentially slow) email send.
+        let config = app_state.config.read().await.clone();
+        let tor_client = app_state.tor_client.read().await.clone();
+
+        // Read expiration and timer type under a short-lived lock, then drop it
+        // before sending so handlers that lock the timer (e.g. check-in) are not
+        // blocked for the duration of a slow Tor send.
+        let (expired, timer_type) = {
+            let timer = app_state.timer.lock().await;
+            (timer.expired(), timer.get_type())
+        };
+
+        if expired {
+            // If Tor is enabled but not yet bootstrapped, defer delivery rather
+            // than falling back to a clearnet send (which would leak the
+            // sender's location) or failing. Skip the state update too, so the
+            // expired Warning isn't silently promoted to DeadMan before its
+            // email is sent. Retry on the next tick.
+            let tor_ready = !config.tor_enabled || tor_client.is_some();
+            if !tor_ready {
+                warn!("timer expired but Tor is not ready yet; deferring email delivery");
+                sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+            match timer_type {
                 TimerType::Warning => {
-                    if let Err(e) = config.send_email(Email::Warning) {
+                    if let Err(e) =
+                        send_email_with_timeout(&config, tor_client.as_deref(), Email::Warning)
+                            .await
+                    {
                         error!(?e, "failed to send warning email");
                     }
                 }
                 TimerType::DeadMan => {
-                    if let Err(e) = config.send_email(Email::DeadMan) {
-                        error!(?e, "failed to send dead man email");
+                    match send_email_with_timeout(&config, tor_client.as_deref(), Email::DeadMan)
+                        .await
+                    {
+                        // Only consume the terminal state on success; otherwise
+                        // keep retrying (with backoff) so a transient failure
+                        // never permanently drops the final email.
+                        Ok(()) => return Ok(()),
+                        Err(e) => {
+                            error!(?e, "failed to send dead man email; will retry");
+                            sleep(DEAD_MAN_RETRY_BACKOFF).await;
+                            continue;
+                        }
                     }
-                    return Ok(());
                 }
             }
         }
-        let elapsed = timer.elapsed();
-        timer
-            .update(elapsed, config.timer_dead_man)
-            .context("Failed to update timer")?;
 
-        // Drop locks before sleeping
-        drop(timer);
-        drop(config);
+        // Re-acquire the timer lock briefly to advance state.
+        {
+            let mut timer = app_state.timer.lock().await;
+            let elapsed = timer.elapsed();
+            timer
+                .update(elapsed, config.timer_dead_man)
+                .context("Failed to update timer")?;
+        }
 
         sleep(Duration::from_secs(1)).await;
     }
@@ -460,6 +546,140 @@ async fn timer_data(
     Json(data)
 }
 
+/// Tor status, returned as JSON by `/api/tor`.
+#[derive(Serialize)]
+struct TorInfo {
+    /// Whether Tor is enabled in the configuration.
+    enabled: bool,
+    /// Runtime status of the Tor subsystem.
+    status: TorStatus,
+    /// The `.onion` address, if the onion service has published one.
+    onion_address: Option<String>,
+}
+
+/// Endpoint returning the current Tor status and onion address as JSON.
+async fn tor_info(
+    Extension(_context): Extension<UserContext>, // Authentication guaranteed by middleware
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    let enabled = state.app_state.config.read().await.tor_enabled;
+    let status = *state.tor_status.read().await;
+    let onion_address = state.tor_address.read().await.clone();
+    Json(TorInfo {
+        enabled,
+        status,
+        onion_address,
+    })
+}
+
+/// Serve the web UI `Router` over the onion service's incoming streams.
+///
+/// Holds the [`OnionEndpoint`] (and thus the `RunningOnionService`) alive for
+/// as long as it runs; returning would stop the onion service.
+async fn serve_onion(mut endpoint: OnionEndpoint, app: Router) {
+    while let Some(stream_request) = endpoint.streams.next().await {
+        let app = app.clone();
+        tokio::spawn(async move {
+            let data_stream = match tor::accept_stream(stream_request).await {
+                Ok(stream) => stream,
+                Err(e) => {
+                    warn!(?e, "failed to accept onion stream");
+                    return;
+                }
+            };
+            // axum's `Router` implements `tower::Service<Request<Incoming>>`;
+            // adapt it to a hyper service and serve a single connection.
+            let service = TowerToHyperService::new(app);
+            if let Err(e) = HyperBuilder::new(TokioExecutor::new())
+                .serve_connection_with_upgrades(TokioIo::new(data_stream), service)
+                .await
+            {
+                warn!(error = %e, "onion connection error");
+            }
+        });
+    }
+}
+
+/// Bootstrap Tor, launch the onion service, and serve the web UI over it.
+///
+/// Runs as a long-lived background task so the clearnet listener stays
+/// available immediately while Tor bootstraps. Populates `tor_address` once the
+/// onion address is known and stores the shared [`DmsTorClient`] in `AppState`
+/// for outbound email.
+async fn run_onion_service(
+    app_state: Arc<AppState>,
+    app: Router,
+    tor_address: Arc<RwLock<Option<String>>>,
+    tor_status: Arc<RwLock<TorStatus>>,
+    nickname: String,
+    state_dir: Option<PathBuf>,
+) {
+    // Bootstrap with retry + capped backoff. If Tor can never bootstrap we keep
+    // trying (and logging) forever rather than silently giving up: with no
+    // clearnet fallback, a permanently-unbootstrapped client means the switch
+    // would otherwise never fire, which is the worst outcome for a dead man's
+    // switch. The repeated logs and the `Failed` status make it visible.
+    let mut backoff = Duration::from_secs(5);
+    let max_backoff = Duration::from_secs(300);
+    let client = loop {
+        *tor_status.write().await = TorStatus::Bootstrapping;
+        match tor::bootstrap_tor_client(state_dir.clone()).await {
+            Ok(client) => break client,
+            Err(e) => {
+                *tor_status.write().await = TorStatus::Failed;
+                error!(
+                    ?e,
+                    retry_in_secs = backoff.as_secs(),
+                    "failed to bootstrap Tor client; will retry (emails are deferred until Tor is up)"
+                );
+                sleep(backoff).await;
+                backoff = (backoff * 2).min(max_backoff);
+            }
+        }
+    };
+    // Share the client so outbound email can reuse it.
+    *app_state.tor_client.write().await = Some(client.clone());
+    info!("Tor client bootstrapped");
+
+    let endpoint = match tor::launch_onion_service(&client, &nickname) {
+        Ok(endpoint) => endpoint,
+        Err(e) => {
+            // Outbound email still works (the client is shared above); only the
+            // inbound onion service is unavailable.
+            error!(
+                ?e,
+                "failed to launch onion service; outbound Tor email still active"
+            );
+            *tor_status.write().await = TorStatus::Running;
+            return;
+        }
+    };
+    *tor_status.write().await = TorStatus::Running;
+
+    // The onion address may not be available immediately after launch (the
+    // descriptor can take a while to publish); poll indefinitely with a capped
+    // backoff and publish it once known.
+    {
+        let service = endpoint.service.clone();
+        let slot = tor_address.clone();
+        tokio::spawn(async move {
+            let mut interval = Duration::from_secs(2);
+            let max_interval = Duration::from_secs(30);
+            loop {
+                if let Some(address) = tor::onion_address_of(&service) {
+                    info!(%address, "onion service address available");
+                    *slot.write().await = Some(address);
+                    return;
+                }
+                sleep(interval).await;
+                interval = (interval * 2).min(max_interval);
+            }
+        });
+    }
+
+    serve_onion(endpoint, app).await;
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Get the Config data.
@@ -480,7 +700,13 @@ async fn main() -> anyhow::Result<()> {
     // Will be initialised from any persisted state, or be set to defaults
     let timer = Timer::new(&config).map_err(|e| anyhow::anyhow!(e))?;
 
-    if config.smtp_check_timeout.is_some_and(|t| t > 0) {
+    if config.tor_enabled {
+        // The startup SMTP check uses a direct (clearnet) connection, which
+        // would leak the sender's network location before Tor is up. Skip it
+        // when Tor is enabled; outbound mail is verified by the actual send
+        // over Tor.
+        info!("Tor enabled: skipping direct SMTP verification to avoid a clearnet connection");
+    } else if config.smtp_check_timeout.is_some_and(|t| t > 0) {
         let smtp_ok = config.check_smtp_connection().is_ok();
         if smtp_ok {
             info!("SMTP server verified");
@@ -506,16 +732,32 @@ async fn main() -> anyhow::Result<()> {
         jwt_secret,
     });
 
+    // Capture Tor settings before `config` is moved into the shared state.
+    let tor_enabled = config.tor_enabled;
+    let tor_nickname = config.tor_nickname.clone();
+    let tor_state_dir = config.tor_state_dir.clone().map(PathBuf::from);
+
     let app_state = Arc::new(AppState {
         config: RwLock::new(config),
         timer: Mutex::new(timer),
+        tor_client: RwLock::new(None),
     });
+
+    // Shared slot for the onion address, populated once the service is up.
+    let tor_address = Arc::new(RwLock::new(None));
+    let tor_status = Arc::new(RwLock::new(if tor_enabled {
+        TorStatus::Bootstrapping
+    } else {
+        TorStatus::Disabled
+    }));
 
     // Create combined shared state
     let shared_state = SharedState {
         app_state: app_state.clone(),
         key: SecureKey::new(Key::generate()),
         secret_data,
+        tor_address: tor_address.clone(),
+        tor_status: tor_status.clone(),
     };
 
     // More restrictive CORS - only allow same origin in production
@@ -527,6 +769,7 @@ async fn main() -> anyhow::Result<()> {
     let protected_routes = Router::new()
         .route("/dashboard", get(show_dashboard).post(handle_check_in))
         .route("/timer", get(timer_data))
+        .route("/api/tor", get(tor_info))
         .route("/check-in", get(handle_check_in))
         .layer(middleware::from_fn(require_auth));
 
@@ -559,6 +802,22 @@ async fn main() -> anyhow::Result<()> {
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(shared_state);
+
+    // Launch the Tor onion service (and share the Tor client for outbound
+    // email) when enabled. Runs in the background so the clearnet listener is
+    // available immediately while Tor bootstraps.
+    if tor_enabled {
+        tokio::spawn(run_onion_service(
+            app_state.clone(),
+            app.clone(),
+            tor_address.clone(),
+            tor_status.clone(),
+            tor_nickname,
+            tor_state_dir,
+        ));
+    } else {
+        info!("Tor disabled in config");
+    }
 
     // Main loop for the timer
     tokio::spawn(async move {

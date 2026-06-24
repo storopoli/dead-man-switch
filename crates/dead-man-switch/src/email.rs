@@ -88,10 +88,40 @@ impl Config {
         mailer.send(&email)?;
         Ok(())
     }
+
+    /// Send the email, routing it through Tor when [`Config::tor_enabled`] is set.
+    ///
+    /// The non-Tor path runs the blocking sync [`Config::send_email`] on a
+    /// dedicated thread so it does not stall the async runtime. The Tor path
+    /// reuses the already-bootstrapped [`arti_client::TorClient`] owned by the
+    /// caller (see [`crate::tor::send_email_tor`]).
+    ///
+    /// # Errors
+    ///
+    /// - If Tor is enabled but no [`arti_client::TorClient`] was provided.
+    /// - If sending the email fails.
+    #[cfg(feature = "tor")]
+    pub async fn send_email_maybe_tor(
+        &self,
+        tor_client: Option<&arti_client::TorClient<tor_rtcompat::PreferredRuntime>>,
+        email_type: Email,
+    ) -> Result<(), crate::tor::TorError> {
+        if self.tor_enabled {
+            let client = tor_client.ok_or(crate::tor::TorError::ServiceDisabled)?;
+            crate::tor::send_email_tor(self, client, email_type).await
+        } else {
+            let config = self.clone();
+            tokio::task::spawn_blocking(move || config.send_email(email_type))
+                .await
+                .map_err(|e| crate::tor::TorError::Config(e.to_string()))??;
+            Ok(())
+        }
+    }
+
     /// Create the email to send.
     ///
     /// If an attachment is provided, the email will be created with the attachment.
-    fn create_email(&self, email_type: Email) -> Result<Message, EmailError> {
+    pub(crate) fn create_email(&self, email_type: Email) -> Result<Message, EmailError> {
         // Guaranteed config values
         let from = Mailbox::new(None, self.from.parse()?);
         // Adjust the email to based on the email type
@@ -188,6 +218,9 @@ mod tests {
             web_password: "password".to_string(),
             cookie_exp_days: 7,
             log_level: None,
+            tor_enabled: false,
+            tor_nickname: "deadman".to_string(),
+            tor_state_dir: None,
         }
     }
 

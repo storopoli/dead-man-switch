@@ -27,6 +27,9 @@ the switch automatically sends the desired message.
 - **Minimal**: Very few dependencies and needs minimal resources.
 - **Warning**: Sends a warning email before the final email.
 - **Attachments** (Optional): Send attachments with the final email.
+- **Tor** (Optional, on by default): Expose the web interface as a Tor onion
+  service and send the notification emails over Tor, using
+  [arti](https://gitlab.torproject.org/tpo/core/arti).
 
 ## How it Works
 
@@ -142,6 +145,51 @@ To use the web interface, please follow the instructions below:
 
 1. Make sure to [reverse proxy](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)
    the web interface with proper security measures such as HTTPS.
+
+### Tor (arti)
+
+Both the base crate and the web interface can route through the
+[Tor](https://www.torproject.org/) network using the pure-Rust
+[arti](https://gitlab.torproject.org/tpo/core/arti) implementation — no
+external `tor` daemon is required. When enabled:
+
+- **Inbound**: the web interface is exposed as a Tor **onion service**, so it
+  can be reached anonymously at a stable `<base32>.onion` address without
+  exposing a clearnet host. The address is available (behind authentication) at
+  the `GET /api/tor` endpoint and is logged on startup.
+- **Outbound**: the warning and dead-man notification emails are delivered to
+  your SMTP server over Tor.
+
+Tor support is compiled in by default (the `tor` Cargo feature). It is
+controlled at runtime by the configuration:
+
+```toml
+tor_enabled   = true        # route the web UI and emails through Tor
+tor_nickname  = "deadman"   # onion service nickname / keystore subdirectory
+# tor_state_dir = "/path"   # optional; defaults to <config_dir>/deadman/tor
+```
+
+arti persists its identity keys under `tor_state_dir`, so the `.onion` address
+remains stable across restarts. The first start takes longer while the Tor
+client bootstraps; the clearnet listener stays available in the meantime.
+
+A few things to be aware of:
+
+- **Outbound mail uses STARTTLS** on the submission port (e.g. `smtp_port = 587`).
+  Implicit-TLS (SMTPS, port 465) is not supported (the non-Tor path has the same
+  requirement).
+- **The clearnet listener is not disabled** when Tor is enabled — the web UI is
+  still served on `0.0.0.0:3000` in addition to the onion service. If you only
+  want it reachable over Tor, restrict that port at the firewall / container
+  level.
+- **No clearnet fallback for email**: if Tor cannot bootstrap, notification
+  emails are deferred (not sent over the clearnet) and the failure is logged
+  repeatedly; `GET /api/tor` reports a `failed` status. This is intentional to
+  avoid leaking your network location, but it means a permanently-unreachable
+  Tor network will prevent delivery.
+
+To build without Tor (a smaller binary, e.g. for the TUI), disable the default
+feature: `cargo build -p dead-man-switch --no-default-features`.
 
 ## StartOS package
 

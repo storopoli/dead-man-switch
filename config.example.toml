@@ -39,3 +39,14 @@ Password is our favorite music in Pascal case.
 web_password    = "password"
 cookie_exp_days = 7
 # log_level       = "info"                      # optional
+
+################################################
+# Tor (arti)
+# When enabled, the web UI is exposed as a Tor onion service and the
+# notification emails are delivered over Tor. Requires a build with the
+# `tor` feature (enabled by default).
+# Note: outbound mail over Tor uses STARTTLS on the submission port (e.g. 587);
+# implicit-TLS (SMTPS, port 465) is not supported.
+tor_enabled   = true
+tor_nickname  = "deadman"                       # onion service nickname / keystore subdir
+# tor_state_dir = "/path/to/arti-state"         # optional; defaults to <config_dir>/deadman/tor

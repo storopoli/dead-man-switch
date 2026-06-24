@@ -11,3 +11,5 @@ pub mod config;
 pub mod email;
 pub mod error;
 pub mod timer;
+#[cfg(feature = "tor")]
+pub mod tor;

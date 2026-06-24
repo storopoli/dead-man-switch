@@ -57,6 +57,35 @@ pub struct Config {
     pub cookie_exp_days: u64,
     /// Log level for the web interface.
     pub log_level: Option<String>,
+    /// Whether to route the web UI and notification emails through Tor.
+    ///
+    /// When enabled, the web interface is exposed as a Tor onion service and
+    /// the warning/dead-man emails are delivered over Tor (via arti).
+    ///
+    /// Note: outbound mail over Tor uses STARTTLS on the submission port
+    /// (e.g. `smtp_port = 587`); implicit-TLS (SMTPS, port 465) is not
+    /// supported. This matches the non-Tor path, which also requires STARTTLS.
+    #[serde(default = "default_tor_enabled")]
+    pub tor_enabled: bool,
+    /// Nickname for the onion service (also used as the keystore subdirectory).
+    #[serde(default = "default_tor_nickname")]
+    pub tor_nickname: String,
+    /// Optional override for arti's state/keystore directory.
+    ///
+    /// Defaults to a `tor` subdirectory of the app's config directory, so the
+    /// `.onion` address stays stable across restarts.
+    #[serde(default)]
+    pub tor_state_dir: Option<String>,
+}
+
+/// Default for [`Config::tor_enabled`].
+fn default_tor_enabled() -> bool {
+    true
+}
+
+/// Default for [`Config::tor_nickname`].
+fn default_tor_nickname() -> String {
+    "deadman".to_string()
 }
 
 impl Default for Config {
@@ -86,6 +115,9 @@ impl Default for Config {
             web_password,
             cookie_exp_days: 7,
             log_level: None,
+            tor_enabled: default_tor_enabled(),
+            tor_nickname: default_tor_nickname(),
+            tor_state_dir: None,
         }
     }
 }
