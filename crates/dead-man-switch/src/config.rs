@@ -61,6 +61,10 @@ pub struct Config {
     ///
     /// When enabled, the web interface is exposed as a Tor onion service and
     /// the warning/dead-man emails are delivered over Tor (via arti).
+    ///
+    /// Note: outbound mail over Tor uses STARTTLS on the submission port
+    /// (e.g. `smtp_port = 587`); implicit-TLS (SMTPS, port 465) is not
+    /// supported. This matches the non-Tor path, which also requires STARTTLS.
     #[serde(default = "default_tor_enabled")]
     pub tor_enabled: bool,
     /// Nickname for the onion service (also used as the keystore subdirectory).

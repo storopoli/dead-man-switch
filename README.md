@@ -173,6 +173,21 @@ arti persists its identity keys under `tor_state_dir`, so the `.onion` address
 remains stable across restarts. The first start takes longer while the Tor
 client bootstraps; the clearnet listener stays available in the meantime.
 
+A few things to be aware of:
+
+- **Outbound mail uses STARTTLS** on the submission port (e.g. `smtp_port = 587`).
+  Implicit-TLS (SMTPS, port 465) is not supported (the non-Tor path has the same
+  requirement).
+- **The clearnet listener is not disabled** when Tor is enabled — the web UI is
+  still served on `0.0.0.0:3000` in addition to the onion service. If you only
+  want it reachable over Tor, restrict that port at the firewall / container
+  level.
+- **No clearnet fallback for email**: if Tor cannot bootstrap, notification
+  emails are deferred (not sent over the clearnet) and the failure is logged
+  repeatedly; `GET /api/tor` reports a `failed` status. This is intentional to
+  avoid leaking your network location, but it means a permanently-unreachable
+  Tor network will prevent delivery.
+
 To build without Tor (a smaller binary, e.g. for the TUI), disable the default
 feature: `cargo build -p dead-man-switch --no-default-features`.
 

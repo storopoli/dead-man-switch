@@ -61,6 +61,10 @@ pub enum TorError {
     #[error("tor configuration error: {0}")]
     Config(String),
 
+    /// Failed to accept an incoming onion-service stream.
+    #[error("failed to accept onion stream: {0}")]
+    Accept(String),
+
     /// The onion service is disabled in arti's configuration, or no Tor client
     /// was available when one was required.
     #[error("onion service is disabled or no Tor client is available")]
@@ -167,7 +171,7 @@ pub async fn accept_stream(request: StreamRequest) -> Result<DataStream, TorErro
     request
         .accept(Connected::new_empty())
         .await
-        .map_err(|e| TorError::Config(e.to_string()))
+        .map_err(|e| TorError::Accept(e.to_string()))
 }
 
 /// Adapts an arti [`DataStream`] into a stream lettre can drive.
