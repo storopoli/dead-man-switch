@@ -440,6 +440,9 @@ mod tests {
             web_password: "password".to_string(),
             cookie_exp_days: 7,
             log_level: None,
+            tor_enabled: false,
+            tor_nickname: "deadman".to_string(),
+            tor_state_dir: None,
         }
     }
 

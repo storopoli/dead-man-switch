@@ -27,6 +27,8 @@ the switch automatically sends the desired message.
 - **Minimal**: Very few dependencies and needs minimal resources.
 - **Warning**: Sends a warning email before the final email.
 - **Attachments** (Optional): Send attachments with the final email.
+- **Tor** (Optional): Expose the web interface as a Tor onion service and send
+  the notification emails over Tor, using [arti](https://gitlab.torproject.org/tpo/core/arti).
 
 ## How it Works
 
@@ -142,6 +144,36 @@ To use the web interface, please follow the instructions below:
 
 1. Make sure to [reverse proxy](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/)
    the web interface with proper security measures such as HTTPS.
+
+### Tor (arti)
+
+Both the base crate and the web interface can route through the
+[Tor](https://www.torproject.org/) network using the pure-Rust
+[arti](https://gitlab.torproject.org/tpo/core/arti) implementation — no
+external `tor` daemon is required. When enabled:
+
+- **Inbound**: the web interface is exposed as a Tor **onion service**, so it
+  can be reached anonymously at a stable `<base32>.onion` address without
+  exposing a clearnet host. The address is available (behind authentication) at
+  the `GET /api/tor` endpoint and is logged on startup.
+- **Outbound**: the warning and dead-man notification emails are delivered to
+  your SMTP server over Tor.
+
+Tor support is compiled in by default (the `tor` Cargo feature). It is
+controlled at runtime by the configuration:
+
+```toml
+tor_enabled   = true        # route the web UI and emails through Tor
+tor_nickname  = "deadman"   # onion service nickname / keystore subdirectory
+# tor_state_dir = "/path"   # optional; defaults to <config_dir>/deadman/tor
+```
+
+arti persists its identity keys under `tor_state_dir`, so the `.onion` address
+remains stable across restarts. The first start takes longer while the Tor
+client bootstraps; the clearnet listener stays available in the meantime.
+
+To build without Tor (a smaller binary, e.g. for the TUI), disable the default
+feature: `cargo build -p dead-man-switch --no-default-features`.
 
 ## StartOS package
 

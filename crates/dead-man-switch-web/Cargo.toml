@@ -8,6 +8,7 @@ license = "AGPL-3.0-only"
 readme = "../../README.md"
 
 [dependencies]
+# Inherits the base crate's default features, which include `tor`.
 dead-man-switch.workspace = true
 
 zeroize.workspace = true
@@ -21,6 +22,11 @@ tower-http = { version = "0.6.11", features = ["tracing", "trace", "cors"] }
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
 
+# Serving the axum router over Tor onion-service streams.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["server", "service", "tokio"] }
+futures = "0.3"
+
 # Auth handling
 axum-extra = { version = "0.12.6", features = ["cookie", "cookie-private"] }
 bcrypt = "0.19.1"
@@ -28,5 +34,5 @@ jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 uuid = { version = "1.23.1", features = ["v4", "serde"] }
 chrono = { workspace = true, features = ["serde"] }
 
-# Rate limiting
-tower = { version = "0.5.3", features = ["buffer", "limit"] }
+# Rate limiting (and `util` for adapting the router into a hyper service)
+tower = { version = "0.5.3", features = ["buffer", "limit", "util"] }

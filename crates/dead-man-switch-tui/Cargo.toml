@@ -8,7 +8,11 @@ license = "AGPL-3.0-only"
 readme = "../../README.md"
 
 [dependencies]
-dead-man-switch.workspace = true
+# The TUI does not need Tor; opt out of the base crate's default `tor` feature
+# to keep this build minimal (no arti dependency tree). Uses a direct path
+# dependency because `default-features = false` cannot override an inherited
+# workspace dependency.
+dead-man-switch = { path = "../dead-man-switch", version = "0.9.4", default-features = false }
 
 thiserror = "2.0.18"
 ratatui = "0.30.0"
