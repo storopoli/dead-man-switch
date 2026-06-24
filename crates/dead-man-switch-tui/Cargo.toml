@@ -12,7 +12,7 @@ readme = "../../README.md"
 # to keep this build minimal (no arti dependency tree). Uses a direct path
 # dependency because `default-features = false` cannot override an inherited
 # workspace dependency.
-dead-man-switch = { path = "../dead-man-switch", version = "0.9.4", default-features = false }
+dead-man-switch = { path = "../dead-man-switch", version = "0.10.0", default-features = false }
 
 thiserror = "2.0.18"
 ratatui = "0.30.0"

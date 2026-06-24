@@ -1103,7 +1103,7 @@ checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
 
 [[package]]
 name = "dead-man-switch"
-version = "0.9.4"
+version = "0.10.0"
 dependencies = [
  "arti-client",
  "chrono",
@@ -1128,7 +1128,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch-tui"
-version = "0.9.4"
+version = "0.10.0"
 dependencies = [
  "dead-man-switch",
  "ratatui",
@@ -1138,7 +1138,7 @@ dependencies = [
 
 [[package]]
 name = "dead-man-switch-web"
-version = "0.9.4"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "askama",
