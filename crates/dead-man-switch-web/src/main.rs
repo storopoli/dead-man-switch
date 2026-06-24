@@ -288,6 +288,18 @@ async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
         let tor_client = app_state.tor_client.read().await.clone();
         // Check timer expiration
         if timer.expired() {
+            // If Tor is enabled but not yet bootstrapped, defer delivery rather
+            // than falling back to a clearnet send (which would leak the
+            // sender's location) or failing. Skip the state update too, so the
+            // expired Warning isn't silently promoted to DeadMan before its
+            // email is sent. Retry on the next tick.
+            let tor_ready = !config.tor_enabled || tor_client.is_some();
+            if !tor_ready {
+                warn!("timer expired but Tor is not ready yet; deferring email delivery");
+                drop(timer);
+                sleep(Duration::from_secs(1)).await;
+                continue;
+            }
             match timer.get_type() {
                 TimerType::Warning => {
                     if let Err(e) = config
@@ -298,13 +310,21 @@ async fn main_timer_loop(app_state: Arc<AppState>) -> anyhow::Result<()> {
                     }
                 }
                 TimerType::DeadMan => {
-                    if let Err(e) = config
+                    match config
                         .send_email_maybe_tor(tor_client.as_deref(), Email::DeadMan)
                         .await
                     {
-                        error!(?e, "failed to send dead man email");
+                        // Only consume the terminal state on success; otherwise
+                        // keep retrying so a transient failure (e.g. Tor not yet
+                        // ready) never permanently drops the final email.
+                        Ok(()) => return Ok(()),
+                        Err(e) => {
+                            error!(?e, "failed to send dead man email; will retry");
+                            drop(timer);
+                            sleep(Duration::from_secs(1)).await;
+                            continue;
+                        }
                     }
-                    return Ok(());
                 }
             }
         }
@@ -600,7 +620,13 @@ async fn main() -> anyhow::Result<()> {
     // Will be initialised from any persisted state, or be set to defaults
     let timer = Timer::new(&config).map_err(|e| anyhow::anyhow!(e))?;
 
-    if config.smtp_check_timeout.is_some_and(|t| t > 0) {
+    if config.tor_enabled {
+        // The startup SMTP check uses a direct (clearnet) connection, which
+        // would leak the sender's network location before Tor is up. Skip it
+        // when Tor is enabled; outbound mail is verified by the actual send
+        // over Tor.
+        info!("Tor enabled: skipping direct SMTP verification to avoid a clearnet connection");
+    } else if config.smtp_check_timeout.is_some_and(|t| t > 0) {
         let smtp_ok = config.check_smtp_connection().is_ok();
         if smtp_ok {
             info!("SMTP server verified");

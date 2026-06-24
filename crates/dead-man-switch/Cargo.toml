@@ -22,6 +22,7 @@ tor = [
   "dep:tor-cell",
   "dep:tor-proto",
   "dep:safelog",
+  "dep:rusqlite",
   # Async lettre surface (`connect_with_transport`); uses the ring rustls
   # provider, matching the existing sync `rustls-tls` feature.
   "lettre/tokio1-rustls-tls",
@@ -53,3 +54,8 @@ tor-hsservice = { version = "0.43.0", optional = true }
 tor-cell = { version = "0.43.0", optional = true }
 tor-proto = { version = "0.43.0", features = ["hs-service", "tokio"], optional = true }
 safelog = { version = "0.8.2", optional = true }
+# Not used directly: pulled in to force the `bundled` feature on the `rusqlite`
+# that arti (tor-persist) depends on, so SQLite is compiled from source. This
+# avoids needing a system `libsqlite3` in every build environment (notably the
+# static musl Docker image and the Nix sandbox).
+rusqlite = { version = "0.37.0", features = ["bundled"], optional = true }
