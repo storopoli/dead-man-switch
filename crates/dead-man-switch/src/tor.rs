@@ -112,9 +112,7 @@ fn build_client_config(state_dir: &Path) -> Result<TorClientConfig, TorError> {
         .storage()
         .state_dir(CfgPath::new_literal(state_dir.to_path_buf()))
         .cache_dir(CfgPath::new_literal(state_dir.join("cache")));
-    builder
-        .build()
-        .map_err(|e| TorError::Config(e.to_string()))
+    builder.build().map_err(|e| TorError::Config(e.to_string()))
 }
 
 /// Bootstrap a Tor client, persisting state under `state_dir`
@@ -219,7 +217,7 @@ impl AsyncTokioStream for TorSmtpStream {
 ///
 /// Opens a [`DataStream`] to the configured SMTP server through `client`, then
 /// drives lettre's async SMTP connection over it (EHLO → STARTTLS → AUTH →
-/// MAIL/RCPT/DATA). The message is built with the same [`Config::create_email`]
+/// MAIL/RCPT/DATA). The message is built with the same `create_email` helper
 /// used by the clearnet path, so behaviour is identical apart from transport.
 ///
 /// Assumes STARTTLS on the submission port (the config default is 587).
@@ -247,7 +245,8 @@ pub async fn send_email_tor(
     conn.starttls(tls, &hello).await?;
 
     let creds = Credentials::new(config.username.clone(), config.password.clone());
-    conn.auth(&[Mechanism::Plain, Mechanism::Login], &creds).await?;
+    conn.auth(&[Mechanism::Plain, Mechanism::Login], &creds)
+        .await?;
     conn.send(&envelope, &body).await?;
     let _ = conn.quit().await;
 
