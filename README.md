@@ -27,8 +27,9 @@ the switch automatically sends the desired message.
 - **Minimal**: Very few dependencies and needs minimal resources.
 - **Warning**: Sends a warning email before the final email.
 - **Attachments** (Optional): Send attachments with the final email.
-- **Tor** (Optional): Expose the web interface as a Tor onion service and send
-  the notification emails over Tor, using [arti](https://gitlab.torproject.org/tpo/core/arti).
+- **Tor** (Optional, on by default): Expose the web interface as a Tor onion
+  service and send the notification emails over Tor, using
+  [arti](https://gitlab.torproject.org/tpo/core/arti).
 
 ## How it Works
 
