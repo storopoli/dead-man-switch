@@ -14,6 +14,14 @@ if [[ -z ${LSIO_READ_ONLY_FS} ]] && [[ -z ${LSIO_NON_ROOT_USER} ]]; then
     mkdir -p "${USERHOME}/.config"
     ln -sf /config "${USERHOME}/.config/deadman"
 
+    # The TUI image is a clearnet-only build. Seed new containers with the
+    # example config adjusted accordingly, while preserving any existing user
+    # configuration mounted at /config.
+    if [[ ! -f /config/config.toml ]]; then
+        cp /defaults/config.toml /config/config.toml
+        sed -i 's/^tor_enabled[[:space:]]*=.*/tor_enabled   = false/' /config/config.toml
+    fi
+
     groupmod -o -g "${PGID}" abc
     usermod -o -u "${PUID}" abc
 

@@ -51,6 +51,7 @@ RUN apk add --no-cache ca-certificates tzdata && \
 
 # Copy binary from builder
 COPY --from=builder /usr/src/app/target/release/${CARGO_PACKAGE}-tui /usr/local/bin/app
+COPY config.example.toml /defaults/config.toml
 
 # Copy root filesystem (for s6-overlay services)
 COPY docker/s6-overlay/_overrides/root/ /
