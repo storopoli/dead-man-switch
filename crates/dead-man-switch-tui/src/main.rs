@@ -336,11 +336,18 @@ fn timer_block(
 /// This function will setup the terminal, run the main loop, and then
 /// restore the terminal.
 fn run() -> Result<(), TuiError> {
-    let mut guard = TerminalGuard::new()?;
-
     // Get the Config data.
     let config = config::load_or_initialize()?;
     let config_path = config::file_path()?.to_string_lossy().into_owned();
+
+    // The TUI intentionally opts out of the base crate's `tor` feature to keep
+    // this binary minimal. Do not silently fall back to direct SMTP when the
+    // shared configuration asks for Tor-routed notification emails.
+    if config.tor_enabled {
+        return Err(TuiError::TorUnsupported);
+    }
+
+    let mut guard = TerminalGuard::new()?;
 
     // Create a new Timer
     // Will be initialised from any persisted state, or be set to defaults

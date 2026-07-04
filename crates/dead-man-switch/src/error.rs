@@ -117,6 +117,13 @@ pub enum TuiError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    /// Tor is enabled in configuration, but the TUI is built without Tor
+    /// support and must not fall back to clearnet SMTP.
+    #[error(
+        "Tor is enabled in the config, but the TUI build does not support Tor. Set tor_enabled = false to use the TUI over clearnet, or use the web UI for Tor-routed email."
+    )]
+    TorUnsupported,
+
     /// [`ConfigError`] blanket error conversion.
     #[error(transparent)]
     Config(#[from] ConfigError),
