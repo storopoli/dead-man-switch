@@ -34,7 +34,7 @@
 
         msrv = pkgs.rust-bin.stable."1.90.0".default;
 
-        package_version = "0.10.0";
+        package_version = "0.10.1";
 
         buildInputs = with pkgs; [
           bashInteractive
